@@ -32,7 +32,7 @@ module Inventory
     end
 
     test "unsupported format is rejected" do
-      assert_raises(InvalidDocument) do
+      assert_raises(Importer::InvalidDocument) do
         Importer.new.call(application: @application,
           artifact_identifier: "git:demo", document: {}, format: "unknown")
       end
