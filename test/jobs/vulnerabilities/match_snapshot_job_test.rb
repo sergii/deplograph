@@ -1,5 +1,4 @@
 require "test_helper"
-require "minitest/mock"
 
 module Vulnerabilities
   class MatchSnapshotJobTest < ActiveSupport::TestCase
@@ -13,21 +12,24 @@ module Vulnerabilities
     end
 
     test "saves affected version matches" do
-      fake = Object.new
-      fake.define_singleton_method(:query_batch) do |purls|
-        purls.to_h { |p| [p, p.include?("rack") ? [{ "id" => "GHSA-demo" }] : []] }
+      stub_request(:post, OsvClient::API_URL).to_return do |request|
+        queries = JSON.parse(request.body).fetch("queries")
+        results = queries.map do |query|
+          package = query.fetch("package").fetch("purl")
+          { vulns: package.include?("rack") ? [{ id: "GHSA-demo" }] : [] }
+        end
+        { status: 200, body: JSON.generate(results: results) }
       end
-      OsvClient.stub(:new, fake) { MatchSnapshotJob.perform_now(@snapshot.id) }
+      MatchSnapshotJob.perform_now(@snapshot.id)
       assert_equal "completed", @snapshot.reload.match_status
       assert_equal 1, @snapshot.vulnerability_matches.count
       assert_equal "GHSA-demo", Vulnerability.last.identifier
     end
 
     test "failed matching is not represented as safe" do
-      fake = Object.new
-      fake.define_singleton_method(:query_batch) { |_purls| raise OsvClient::QueryError, "unavailable" }
+      stub_request(:post, OsvClient::API_URL).to_return(status: 503)
       assert_raises(OsvClient::QueryError) do
-        OsvClient.stub(:new, fake) { MatchSnapshotJob.perform_now(@snapshot.id) }
+        MatchSnapshotJob.perform_now(@snapshot.id)
       end
       assert_equal "failed", @snapshot.reload.match_status
     end
