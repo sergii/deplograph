@@ -44,7 +44,7 @@ module Integrations
         existing = environment.deployment_events.find_by(source: source, event_id: event_id)
         if existing
           raise Conflict, "Event ID already used with different payload" unless existing.payload == body
-          return existing
+          next existing
         end
 
         digest = body["image_digest"]
@@ -124,7 +124,7 @@ module Integrations
 
       deployment = environment.deployments.find_or_initialize_by(external_id: id)
       if deployment.persisted?
-        if artifact && deployment.artifact_id != artifact.id
+        if type == "deployment.reported" && artifact && deployment.artifact_id != artifact.id
           raise Conflict, "Deployment ID already refers to another artifact"
         end
         if release && deployment.release_id.present? && deployment.release_id != release.id
