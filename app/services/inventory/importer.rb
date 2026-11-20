@@ -22,7 +22,7 @@ module Inventory
         artifact.save!
 
         snapshot = artifact.inventory_snapshots.find_or_initialize_by(sha256: digest)
-        return snapshot if snapshot.persisted?
+        next snapshot if snapshot.persisted?
 
         snapshot.assign_attributes(format: format, raw_document: document, source: source)
         snapshot.save!
