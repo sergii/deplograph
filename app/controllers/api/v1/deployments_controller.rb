@@ -53,7 +53,7 @@ module Api
       private
 
       def infer_kind(name)
-        return name if Environment.new(kind: name).valid?(:kind)
+        return name if %w[production staging sandbox test preview development other].include?(name)
         return "preview" if name.start_with?("preview")
 
         "other"
