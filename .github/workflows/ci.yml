@@ -36,5 +36,10 @@ jobs:
           ruby-version: .ruby-version
           bundler-cache: false
       - run: bundle install --jobs 4 --retry 3
+      - name: Emit resolved lockfile for initial repository bootstrap
+        run: |
+          printf 'BEGIN_DEPL_LOCKFILE_BASE64='
+          base64 -w0 Gemfile.lock
+          printf '=END_DEPL_LOCKFILE_BASE64\\n'
       - run: bin/rails db:prepare
       - run: bin/rails test
