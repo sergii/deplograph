@@ -254,14 +254,19 @@ components:
         kind: { type: string }
         state: { type: string }
         expires_at: { type: [string, 'null'], format: date-time }
-        reported: { type: [object, 'null'] }
+        reported:
+          type: [object, 'null']
+          properties:
+            reporting_sources: { type: array, items: { type: string } }
         observed:
           type: array
           items:
             type: object
-            required: [workload, image_digest, observed_at, fresh, inventory_status, vulnerability_ids]
+            required: [workload, source, event_id, image_digest, observed_at, fresh, inventory_status, vulnerability_ids]
             properties:
               workload: { type: string }
+              source: { type: string }
+              event_id: { type: string }
               image_digest: { type: string }
               observed_at: { type: string, format: date-time }
               fresh: { type: boolean }
