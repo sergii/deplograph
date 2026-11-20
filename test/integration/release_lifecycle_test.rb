@@ -59,6 +59,9 @@ class ReleaseLifecycleTest < ActionDispatch::IntegrationTest
     environments = response.parsed_body.fetch("environments").index_by { |entry| entry.fetch("name") }
     production = environments.fetch("production").fetch("observed").first
     staging = environments.fetch("staging").fetch("observed").first
+    assert_equal %w[github_actions kamal],
+      environments.fetch("production").fetch("reported").fetch("reporting_sources")
+    assert_equal "kubernetes", production.fetch("source")
     assert_equal @digest_a, production.fetch("image_digest")
     assert_equal @digest_b, staging.fetch("image_digest")
     assert_equal ["CVE-SIMULATED-0001"], production.fetch("vulnerability_ids")
