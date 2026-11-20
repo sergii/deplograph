@@ -5,7 +5,7 @@ RUN apt-get update -qq && \
     rm -rf /var/lib/apt/lists/*
 
 WORKDIR /rails
-COPY Gemfile .ruby-version ./
+COPY Gemfile Gemfile.lock .ruby-version ./
 RUN bundle install
 COPY . .
 
