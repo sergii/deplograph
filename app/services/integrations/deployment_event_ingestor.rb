@@ -18,7 +18,7 @@ module Integrations
 
       event_id = body.fetch("event_id")
       raise ArgumentError, "Invalid event ID" unless event_id.is_a?(String) &&
-        event_id.match?(/\A[\w.:/-]{1,160}\z/)
+        event_id.match?(%r{\A[-\w.:/]{1,160}\z})
 
       occurred = Time.iso8601(body.fetch("occurred_at"))
       raise ArgumentError, "Event timestamp is outside allowed window" if
@@ -71,7 +71,7 @@ module Integrations
         if type == "artifact.observed"
           raise ArgumentError, "Image digest required" if digest.blank?
           workload = body.fetch("workload")
-          raise ArgumentError, "Invalid workload" unless workload.match?(/\A[\w./-]{1,150}\z/)
+          raise ArgumentError, "Invalid workload" unless workload.match?(%r{\A[-\w./]{1,150}\z})
 
           environment.deployment_observations.create!(
             deployment: deployment, artifact: artifact, source: source,
