@@ -1,6 +1,9 @@
 class Deployment < ApplicationRecord
   belongs_to :environment
   belongs_to :artifact
+  belongs_to :release, optional: true
+  has_many :deployment_events, dependent: :nullify
+  has_many :deployment_observations, dependent: :nullify
 
   validates :deployed_at, presence: true
   validates :status, inclusion: { in: %w[reported observed] }
