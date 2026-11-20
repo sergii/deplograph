@@ -76,7 +76,7 @@ Matching is not exploitability analysis. No claim is made that a component is ex
 - No GitHub App installation flow or production-grade OCI image scanner yet.
 - No actual Slack notifications are sent. Slack can be integrated after alert rules and tenant isolation.
 - Do not make the dashboard public: there is no user sign-in yet.
-- Before production use, generate and commit Gemfile.lock, pin GitHub Actions to reviewed SHAs, set rate limits, audit logs and least-privilege secrets.
+- Before production use, pin GitHub Actions to reviewed SHAs, set rate limits, audit logs and least-privilege secrets.
 
 ## Tests
 
