@@ -15,6 +15,8 @@ module Exposure
             deployment_id: latest_report.external_id,
             artifact: latest_report.artifact.identifier,
             release: latest_report.release&.name,
+            reporting_sources: latest_report.deployment_events
+              .where(event_type: "deployment.reported").distinct.pluck(:source).sort,
             status: latest_report.status,
             deployed_at: latest_report.deployed_at
           },
@@ -32,6 +34,8 @@ module Exposure
         .includes(:vulnerability).map { |match| match.vulnerability.identifier }.uniq.sort : []
       {
         workload: observation.workload,
+        source: observation.source,
+        event_id: observation.event_id,
         image_digest: observation.image_digest,
         observed_at: observation.observed_at,
         fresh: observation.observed_at >= Time.current - MAX_FRESHNESS,
