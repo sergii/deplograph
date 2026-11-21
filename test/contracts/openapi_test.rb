@@ -5,6 +5,7 @@ class OpenapiTest < ActiveSupport::TestCase
   EXPECTED = {
     "/api/v1/inventories" => { "post" => "201" },
     "/api/v1/inventories/lockfile" => { "post" => "201" },
+    "/api/v1/drift/comparisons" => { "post" => "201", "get" => "200" },
     "/api/v1/releases" => { "get" => "200", "post" => "201" },
     "/api/v1/deployments" => { "post" => "201" },
     "/api/v1/integration_events" => { "post" => "202" },
@@ -32,6 +33,16 @@ class OpenapiTest < ActiveSupport::TestCase
         end
       end
     end
+  end
+
+  test "drift comparison by-id API has an OpenAPI path and a real Rails route" do
+    spec = YAML.safe_load_file(Rails.root.join("public/openapi.yaml"))
+    assert spec.dig("paths", "/api/v1/drift/comparisons/{id}", "get", "responses").key?("200")
+    route = Rails.application.routes.recognize_path(
+      "/api/v1/drift/comparisons/42", method: :get
+    )
+    assert_equal "drift_comparisons", route.fetch(:controller).split("/").last
+    assert_equal "show", route.fetch(:action)
   end
 
   test "OpenAPI JSON response envelopes declare required keys" do
