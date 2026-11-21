@@ -3,7 +3,11 @@ require "test_helper"
 class ReleaseLifecycleTest < ActionDispatch::IntegrationTest
   setup do
     @previous_token = ENV["DEPLOGRAPH_INGEST_TOKEN"]
+    @previous_kubernetes_token = ENV["DEPLOGRAPH_KUBERNETES_OBSERVER_TOKEN"]
+    @previous_kamal_token = ENV["DEPLOGRAPH_KAMAL_AGENT_OBSERVER_TOKEN"]
     ENV["DEPLOGRAPH_INGEST_TOKEN"] = "simulation-test-token"
+    ENV["DEPLOGRAPH_KUBERNETES_OBSERVER_TOKEN"] = "test-kubernetes-observer-secret"
+    ENV["DEPLOGRAPH_KAMAL_AGENT_OBSERVER_TOKEN"] = "test-kamal-observer-secret"
     @repository = "acme/rails-app"
     @sha_a = "b" * 40
     @sha_b = "c" * 40
@@ -16,6 +20,8 @@ class ReleaseLifecycleTest < ActionDispatch::IntegrationTest
 
   teardown do
     ENV["DEPLOGRAPH_INGEST_TOKEN"] = @previous_token
+    ENV["DEPLOGRAPH_KUBERNETES_OBSERVER_TOKEN"] = @previous_kubernetes_token
+    ENV["DEPLOGRAPH_KAMAL_AGENT_OBSERVER_TOKEN"] = @previous_kamal_token
   end
 
   test "GitHub Actions and Kamal report one deployment with Kubernetes evidence" do
@@ -51,6 +57,7 @@ class ReleaseLifecycleTest < ActionDispatch::IntegrationTest
     assert_equal 2, Deployment.count
     assert_equal 5, DeploymentEvent.count
     assert_equal 2, DeploymentObservation.count
+    assert_equal %w[reported], Deployment.distinct.pluck(:status).sort
     assert_equal 2, Release.count
     assert_equal 2, Build.count
 
@@ -62,6 +69,8 @@ class ReleaseLifecycleTest < ActionDispatch::IntegrationTest
     assert_equal %w[github_actions kamal],
       environments.fetch("production").fetch("reported").fetch("reporting_sources")
     assert_equal "kubernetes", production.fetch("source")
+    assert_equal "partial", environments.fetch("production").fetch("verification_status")
+    assert_equal "partial", environments.fetch("staging").fetch("verification_status")
     assert_equal @digest_a, production.fetch("image_digest")
     assert_equal @digest_b, staging.fetch("image_digest")
     assert_equal ["CVE-SIMULATED-0001"], production.fetch("vulnerability_ids")
@@ -112,6 +121,8 @@ class ReleaseLifecycleTest < ActionDispatch::IntegrationTest
     production = response.parsed_body.fetch("environments").find { |env| env["name"] == "production" }
     assert_equal @digest_b, production.fetch("observed").first.fetch("image_digest")
     assert_equal @artifact_a, production.fetch("reported").fetch("artifact")
+    assert_equal "conflicting_observation", production.fetch("verification_status")
+    assert_equal "reported", Deployment.last.status
     assert_equal 1, Deployment.count
     assert_equal 2, DeploymentObservation.count
   end
@@ -159,8 +170,17 @@ class ReleaseLifecycleTest < ActionDispatch::IntegrationTest
   end
 
   def send_event(body)
-    post "/api/v1/integration_events", params: JSON.generate(body), headers: auth_headers
+    headers = body["event_type"] == "artifact.observed" ? observer_headers(body["source"]) : auth_headers
+    post "/api/v1/integration_events", params: JSON.generate(body), headers: headers
     assert_response :accepted, response.body
+  end
+
+  def observer_headers(source)
+    token = {
+      "kubernetes" => "test-kubernetes-observer-secret",
+      "kamal_agent" => "test-kamal-observer-secret"
+    }.fetch(source)
+    auth_headers.merge("Authorization" => "Bearer #{token}")
   end
 
   def auth_headers
