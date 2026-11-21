@@ -7,9 +7,16 @@ class DriftComparison < ApplicationRecord
   validates :mode, inclusion: { in: %w[reported observed configuration_names configuration_fingerprints] }
   validates :status, inclusion: { in: %w[same different partial unknown stale] }
   validates :compared_at, presence: true
+  has_many :drift_finding_events, dependent: :nullify
+  after_create :materialize_findings
+
   validate :all_resources_belong_to_organization
 
   private
+
+  def materialize_findings
+    Findings::IngestComparison.new.call(self)
+  end
 
   def all_resources_belong_to_organization
     return unless organization && application && baseline_environment && target_environment
