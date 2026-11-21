@@ -1,6 +1,10 @@
 class DriftDashboardController < ApplicationController
   layout "operations"
 
+  rescue_from ActiveRecord::RecordNotFound do
+    head :not_found
+  end
+
   def index
     @applications = current_organization.applications.order(:name)
     comparisons = current_organization.drift_comparisons
@@ -40,8 +44,6 @@ class DriftDashboardController < ApplicationController
     )
     redirect_to drift_comparison_path(comparison),
       notice: "Comparison created from #{mode} evidence"
-  rescue ActiveRecord::RecordNotFound
-    head :not_found
   rescue ArgumentError
     head :unprocessable_entity
   end
