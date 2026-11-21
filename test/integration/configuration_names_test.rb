@@ -98,6 +98,8 @@ class ConfigurationNamesTest < ActionDispatch::IntegrationTest
   test "different sources or missing snapshots return unknown, not an empty diff" do
     create_snapshot(environment: "staging", source: "github_actions",
       keys: %w[DATABASE_URL])
+    @organization.applications.find_by!(repository_full_name: "acme/payments")
+      .environments.find_or_create_by!(name: "production") { |env| env.kind = "production" }
     compare_names
     assert_equal "unknown", response.parsed_body.fetch("status")
 
