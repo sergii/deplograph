@@ -24,8 +24,43 @@ kubectl create namespace "${namespace}"
 
 # Both Deployments use a single public OCI image; container names match the
 # operator-approved workload contract in the attestor manifest.
-kubectl -n "${namespace}" create deployment web --replicas=2 --image=registry.k8s.io/pause:3.10.1
-kubectl -n "${namespace}" create deployment worker --replicas=1 --image=registry.k8s.io/pause:3.10.1
+kubectl -n "${namespace}" apply -f - <<'YAML'
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: web
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: web
+  template:
+    metadata:
+      labels:
+        app: web
+    spec:
+      containers:
+        - name: web
+          image: registry.k8s.io/pause:3.10.1
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: worker
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: worker
+  template:
+    metadata:
+      labels:
+        app: worker
+    spec:
+      containers:
+        - name: worker
+          image: registry.k8s.io/pause:3.10.1
+YAML
 kubectl -n "${namespace}" rollout status deployment/web --timeout=180s
 kubectl -n "${namespace}" rollout status deployment/worker --timeout=180s
 
