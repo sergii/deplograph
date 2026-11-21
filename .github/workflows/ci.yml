@@ -27,20 +27,13 @@ jobs:
       RAILS_ENV: test
       DATABASE_URL: postgres://postgres:postgres@localhost:5432/deplograph_test
       SECRET_KEY_BASE: test-only-secret-key-base
-      DEPLOGRAPH_INGEST_TOKEN: test-only-ingest-token
       OSV_ENABLED: "false"
     steps:
       - uses: actions/checkout@v4
       - uses: ruby/setup-ruby@v1
         with:
           ruby-version: .ruby-version
-          bundler-cache: false
-      - name: Resolve dependencies and capture updated lockfile
-        run: |
-          bundle install --jobs 4 --retry 3
-          printf 'BEGIN_DEPLOGRAPH_LOCKFILE='
-          base64 -w0 Gemfile.lock
-          printf '=END_DEPLOGRAPH_LOCKFILE\n'
+          bundler-cache: true
       - name: Validate Docker Compose configuration
         run: docker compose config --quiet
       - run: bin/rails db:prepare
