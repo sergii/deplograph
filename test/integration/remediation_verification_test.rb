@@ -290,6 +290,11 @@ class RemediationVerificationTest < ActionDispatch::IntegrationTest
       target_environment: @production, mode: "reported", status: status,
       compared_at: compared_at,
       result: { "confidence" => "reported_only", "verified_runtime" => false,
+        "target" => { "workloads" => @deployment ? [{
+          "event_id" => @deployment.external_id,
+          "artifact_identifier" => @artifact.image_digest,
+          "recorded_at" => compared_at.utc.iso8601
+        }] : [] },
         "dimensions" => dimensions }
     )
   end
