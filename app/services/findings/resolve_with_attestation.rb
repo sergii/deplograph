@@ -7,7 +7,23 @@ module Findings
       return [] unless attestor.active? && attestor.resolution_enabled &&
         attestation.complete? &&
         attestation.observed_at >= Time.current - Runtime::AttestationProtocol::MAX_AGE &&
-        attestor.environment.state == "active"
+        attestor.environment.state == "active" &&
+        attestation.observed_at <= Time.current
+
+      # Do not close findings from out-of-order or same-timestamp observations.
+      # Any newer or concurrent report, including incomplete or contradictory
+      # evidence, makes this snapshot unsuitable for authoritative resolution.
+      # Acceptance is serialized on the environment row by AcceptAttestation.
+      superseded = RuntimeAttestation.joins(:runtime_attestor)
+        .where(runtime_attestors: {
+          organization_id: attestor.organization_id,
+          application_id: attestor.application_id,
+          environment_id: attestor.environment_id
+        })
+        .where("runtime_attestations.observed_at >= ?", attestation.observed_at)
+        .where.not(id: attestation.id)
+        .exists?
+      return [] if superseded
 
       resolved = []
       DriftFinding.where(
