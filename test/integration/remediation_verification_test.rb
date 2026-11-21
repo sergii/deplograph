@@ -181,6 +181,10 @@ class RemediationVerificationTest < ActionDispatch::IntegrationTest
   test "read API is scoped to both environments and never calls verification authoritative" do
     login(@owner)
     record_applied_deployment
+    patch finding_path(@finding), params: {
+      status: "verification_pending", note: "Track candidate remediation"
+    }
+    assert_redirected_to finding_path(@finding)
     travel 2.minutes do
       compare_artifact(status: "same", compared_at: Time.current)
     end
