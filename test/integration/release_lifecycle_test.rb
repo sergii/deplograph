@@ -2,12 +2,21 @@ require "test_helper"
 
 class ReleaseLifecycleTest < ActionDispatch::IntegrationTest
   setup do
-    @previous_token = ENV["DEPLOGRAPH_INGEST_TOKEN"]
-    @previous_kubernetes_token = ENV["DEPLOGRAPH_KUBERNETES_OBSERVER_TOKEN"]
-    @previous_kamal_token = ENV["DEPLOGRAPH_KAMAL_AGENT_OBSERVER_TOKEN"]
-    ENV["DEPLOGRAPH_INGEST_TOKEN"] = "simulation-test-token"
-    ENV["DEPLOGRAPH_KUBERNETES_OBSERVER_TOKEN"] = "test-kubernetes-observer-secret"
-    ENV["DEPLOGRAPH_KAMAL_AGENT_OBSERVER_TOKEN"] = "test-kamal-observer-secret"
+    @organization = create_test_organization
+    @tokens = {}
+    @tokens["api"] = issue_test_token(organization: @organization, provider: "api")
+    @tokens["github_actions"] = issue_test_token(
+      organization: @organization, provider: "github_actions",
+      permissions: %w[report]
+    )
+    @tokens["kamal"] = issue_test_token(
+      organization: @organization, provider: "kamal",
+      permissions: %w[report]
+    )
+    @tokens["kubernetes"] = issue_test_token(
+      organization: @organization, provider: "kubernetes",
+      permissions: %w[observe]
+    )
     @repository = "acme/rails-app"
     @sha_a = "b" * 40
     @sha_b = "c" * 40
@@ -16,12 +25,6 @@ class ReleaseLifecycleTest < ActionDispatch::IntegrationTest
     @artifact_a = "oci:ghcr.io/acme/rails-app@#{@digest_a}"
     @artifact_b = "oci:ghcr.io/acme/rails-app@#{@digest_b}"
     @current_time = Time.current.utc.iso8601
-  end
-
-  teardown do
-    ENV["DEPLOGRAPH_INGEST_TOKEN"] = @previous_token
-    ENV["DEPLOGRAPH_KUBERNETES_OBSERVER_TOKEN"] = @previous_kubernetes_token
-    ENV["DEPLOGRAPH_KAMAL_AGENT_OBSERVER_TOKEN"] = @previous_kamal_token
   end
 
   test "GitHub Actions and Kamal report one deployment with Kubernetes evidence" do
@@ -90,7 +93,7 @@ class ReleaseLifecycleTest < ActionDispatch::IntegrationTest
     assert_equal 1, Deployment.count
 
     altered = body.merge("deployment_id" => "different-deployment")
-    post "/api/v1/integration_events", params: JSON.generate(altered), headers: auth_headers
+    post "/api/v1/integration_events", params: JSON.generate(altered), headers: bearer_headers(@tokens.fetch("github_actions"))
     assert_response :conflict
     assert_equal 1, Deployment.count
   end
@@ -99,8 +102,8 @@ class ReleaseLifecycleTest < ActionDispatch::IntegrationTest
     body = event("production", "github_actions", "artifact.observed",
       "bad-observation", "prod-1", nil, @artifact_a, @digest_a, workload: "web")
 
-    post "/api/v1/integration_events", params: JSON.generate(body), headers: auth_headers
-    assert_response :unprocessable_entity
+    post "/api/v1/integration_events", params: JSON.generate(body), headers: bearer_headers(@tokens.fetch("github_actions"))
+    assert_response :forbidden
     assert_equal 0, DeploymentObservation.count
   end
 
@@ -135,7 +138,7 @@ class ReleaseLifecycleTest < ActionDispatch::IntegrationTest
       build: { provider: "github_actions", id: "build-#{name}" },
       artifacts: [{ identifier: identifier, image_digest: digest }]
     }
-    post "/api/v1/releases", params: JSON.generate(body), headers: auth_headers
+    post "/api/v1/releases", params: JSON.generate(body), headers: bearer_headers(@tokens.fetch("github_actions"))
     assert_response :created
   end
 
@@ -170,21 +173,12 @@ class ReleaseLifecycleTest < ActionDispatch::IntegrationTest
   end
 
   def send_event(body)
-    headers = body["event_type"] == "artifact.observed" ? observer_headers(body["source"]) : auth_headers
+    headers = bearer_headers(@tokens.fetch(body.fetch("source")))
     post "/api/v1/integration_events", params: JSON.generate(body), headers: headers
     assert_response :accepted, response.body
   end
 
-  def observer_headers(source)
-    token = {
-      "kubernetes" => "test-kubernetes-observer-secret",
-      "kamal_agent" => "test-kamal-observer-secret"
-    }.fetch(source)
-    auth_headers.merge("Authorization" => "Bearer #{token}")
-  end
-
   def auth_headers
-    { "CONTENT_TYPE" => "application/json",
-      "Authorization" => "Bearer simulation-test-token" }
+    bearer_headers(@tokens.fetch("api"))
   end
 end
