@@ -43,6 +43,38 @@ class ConfigurationNamesTest < ActionDispatch::IntegrationTest
     assert_equal "different", response.parsed_body.fetch("status")
   end
 
+  test "90 staging keys versus 110 production keys can mean 10 removed and 30 added" do
+    shared = (1..80).map { |i| "SHARED_#{i}" }
+    staging = shared + (1..10).map { |i| "STAGING_#{i}" }
+    production = shared + (1..30).map { |i| "PRODUCTION_#{i}" }
+    create_snapshot(environment: "staging", keys: staging)
+    create_snapshot(environment: "production", keys: production)
+    compare_names
+
+    assert_response :created
+    result = response.parsed_body.dig("result", "dimensions", "environment_variables")
+    assert_equal 90, result.fetch("baseline_count")
+    assert_equal 110, result.fetch("target_count")
+    assert_equal 80, result.fetch("common_count")
+    assert_equal 10, result.fetch("only_in_baseline").length
+    assert_equal 30, result.fetch("only_in_target").length
+    assert_equal "different", result.fetch("status")
+  end
+
+  test "equal key counts do not imply the same set of keys" do
+    create_snapshot(environment: "staging", keys: %w[A B C])
+    create_snapshot(environment: "production", keys: %w[A B D])
+    compare_names
+
+    assert_response :created
+    result = response.parsed_body.dig("result", "dimensions", "environment_variables")
+    assert_equal 3, result.fetch("baseline_count")
+    assert_equal 3, result.fetch("target_count")
+    assert_equal ["C"], result.fetch("only_in_baseline")
+    assert_equal ["D"], result.fetch("only_in_target")
+    assert_equal "different", result.fetch("status")
+  end
+
   test "ENV snapshot ingestion rejects values and unsupported fields before persistence" do
     body = snapshot_body(environment: "staging", keys: ["DATABASE_URL"])
     body[:values] = { DATABASE_URL: "postgres://password@host/database" }
