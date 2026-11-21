@@ -54,7 +54,60 @@ module Api
         render json: present(finding)
       end
 
+
+      def remediations
+        finding = scoped_finding(params[:id])
+        return if performed?
+
+        entries = finding.remediation_attempts
+          .order(created_at: :desc, id: :desc).limit(100)
+        render json: {
+          remediations: entries.map do |attempt|
+            {
+              id: attempt.id, status: attempt.status, description: attempt.description,
+              reference_url: attempt.reference_url, release_id: attempt.release_id,
+              deployment_id: attempt.deployment_id,
+              vulnerability_scan_run_id: attempt.vulnerability_scan_run_id,
+              created_at: attempt.created_at
+            }
+          end
+        }
+      end
+
+      def verifications
+        finding = scoped_finding(params[:id])
+        return if performed?
+
+        entries = finding.finding_verification_checks
+          .order(checked_at: :desc, id: :desc).limit(100)
+        render json: {
+          verifications: entries.map do |check|
+            {
+              id: check.id, comparison_id: check.drift_comparison_id,
+              remediation_attempt_id: check.remediation_attempt_id,
+              trigger: check.trigger, outcome: check.outcome,
+              reason_code: check.reason_code, evidence_quality: check.evidence_quality,
+              authoritative: false, checked_at: check.checked_at
+            }
+          end
+        }
+      end
+
       private
+
+      def scoped_finding(id)
+        finding = current_organization.drift_findings
+          .includes(:application, :baseline_environment, :target_environment).find(id)
+        repo = finding.application.repository_full_name
+        unless current_credential.permits?(permission: "read", repository: repo,
+                 environment: finding.baseline_environment.name) &&
+               current_credential.permits?(permission: "read", repository: repo,
+                 environment: finding.target_environment.name)
+          render json: { error: "Insufficient credential scope" }, status: :forbidden
+          return nil
+        end
+        finding
+      end
 
       def present(finding)
         {
