@@ -31,7 +31,12 @@ Rails.application.routes.draw do
       post "environment_events", to: "environment_events#create"
       post "repositories/inspect", to: "repositories#inspect"
       resources :releases, only: %i[index create]
-      resources :findings, only: %i[index show]
+      resources :findings, only: %i[index show] do
+        member do
+          get :remediations
+          get :verifications
+        end
+      end
       resources :environments, only: :index
       resources :drift_comparisons, only: %i[index create show], path: "drift/comparisons"
       resources :configuration_snapshots, only: %i[index create]
