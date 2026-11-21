@@ -10,14 +10,10 @@ class RuntimeAttestor < ApplicationRecord
   has_many :runtime_attestations, dependent: :destroy
 
   validates :name, presence: true, length: { maximum: 120 }
-  validates :workload, format: { with: /\A[a-z0-9](?:[-a-z0-9.]*[a-z0-9])?\z/ },
-    length: { maximum: 120 }
   validates :image_repository, format: {
     with: %r{\A[a-zA-Z0-9._-]+(?::[0-9]+)?(?:/[a-zA-Z0-9._-]+)+\z}
   }
-  validates :expected_replicas, numericality: {
-    only_integer: true, greater_than: 0, less_than_or_equal_to: 1_000
-  }
+  validate :expected_workload_contract
   validates :public_key_pem, presence: true
   validate :signed_source_is_authorized
   validate :public_key_is_ed25519
@@ -31,6 +27,17 @@ class RuntimeAttestor < ApplicationRecord
   end
 
   private
+
+  def expected_workload_contract
+    unless expected_workloads.is_a?(Hash) && expected_workloads.size.between?(1, 20) &&
+           expected_workloads.keys.all? { |name|
+             name.is_a?(String) && name.match?(/\A[a-z0-9](?:[-a-z0-9.]*[a-z0-9])?\z/) && name.length <= 120
+           } &&
+           expected_workloads.values.all? { |count| count.is_a?(Integer) && count.between?(1, 1_000) } &&
+           expected_workloads.values.sum <= 1_000
+      errors.add(:expected_workloads, "must describe 1-20 named workloads with a total of 1-1000 expected replicas")
+    end
+  end
 
   def signed_source_is_authorized
     return unless organization && application && environment &&
@@ -54,7 +61,7 @@ class RuntimeAttestor < ApplicationRecord
     key = signing_key
     errors.add(:public_key_pem, "must be an Ed25519 public key") unless
       key.oid == "ED25519" && key.public_to_pem == public_key_pem
-  rescue OpenSSL::PKey::PKeyError, OpenSSL::PKey::PKeyError => error
+  rescue OpenSSL::PKey::PKeyError, OpenSSL::PKey::PKeyError
     errors.add(:public_key_pem, "is not a valid Ed25519 public key")
   end
 end
