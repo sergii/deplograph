@@ -39,8 +39,10 @@ module Configuration
           "both"
         elsif left_keys.include?(name)
           "baseline_only"
-        else
+        elsif right_keys.include?(name)
           "target_only"
+        else
+          "absent_both"
         end
         relation = if presence != "both"
           "missing"
