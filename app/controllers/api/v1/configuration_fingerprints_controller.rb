@@ -24,6 +24,12 @@ module Api
 
         repository = body.fetch("repository")
         environment_name = body.fetch("environment")
+        unless %w[report observe].any? { |permission|
+          current_credential.permits?(permission: permission, repository: repository,
+            environment: environment_name)
+        }
+          return render json: { error: "Insufficient credential scope" }, status: :forbidden
+        end
         app = current_organization.applications.find_by!(repository_full_name: repository)
         environment = app.environments.find_by!(name: environment_name)
         snapshot = environment.configuration_snapshots.find(body.fetch("snapshot_id"))
