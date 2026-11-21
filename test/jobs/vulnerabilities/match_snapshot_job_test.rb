@@ -3,7 +3,7 @@ require "test_helper"
 module Vulnerabilities
   class MatchSnapshotJobTest < ActiveSupport::TestCase
     setup do
-      application = Application.create!(name: "Demo", repository_full_name: "acme/job-demo")
+      application = Application.create!(organization: create_test_organization, name: "Demo", repository_full_name: "acme/job-demo")
       @snapshot = Inventory::Importer.new.call(
         application: application, artifact_identifier: "git:demo",
         format: "cyclonedx",

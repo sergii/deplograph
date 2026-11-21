@@ -4,7 +4,13 @@ module Api
       rescue_from Releases::Registrar::Conflict, with: :conflict
 
       def create
-        release = Releases::Registrar.new.call(payload)
+        body = payload
+        return unless authorize_integration!(
+          permission: "report", repository: body["repository"],
+          provider: body.dig("build", "provider")
+        )
+
+        release = Releases::Registrar.new.call(body, organization: current_organization)
         render json: {
           id: release.id,
           repository: release.application.repository_full_name,
@@ -16,7 +22,8 @@ module Api
 
       def index
         repository = params.require(:repository)
-        application = Application.find_by!(repository_full_name: repository)
+        return unless authorize_integration!(permission: "read", repository: repository)
+        application = current_organization.applications.find_by!(repository_full_name: repository)
         render json: {
           releases: application.releases.order(created_at: :desc).limit(100).map do |release|
             { name: release.name, commit_sha: release.source_revision&.commit_sha,

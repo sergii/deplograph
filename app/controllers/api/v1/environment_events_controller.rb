@@ -3,6 +3,9 @@ module Api
     class EnvironmentEventsController < BaseController
       def create
         body = payload
+        return unless authorize_integration!(
+          permission: "report", repository: body["repository"], environment: body["environment"]
+        )
         app = application_for(body)
         kind = body.fetch("kind", "other")
         event = body.fetch("event")

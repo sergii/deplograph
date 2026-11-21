@@ -8,7 +8,7 @@
 - source_app/: fixture-only Dockerfile, Ruby version and intentionally incomplete lockfile.
 - mock_github_server.rb: localhost GitHub API emulator for manual inspection.
 
-Start Rails and set DEPLOGRAPH_INGEST_TOKEN.
+Start Rails, run `bin/rails identity:bootstrap`, and issue a scoped API credential via `bin/rails identity:issue` (see root README). Set `DEPLOGRAPH_API_TOKEN` in your client shell.
 
 Import the SBOM using the API:
 
@@ -16,20 +16,23 @@ Import the SBOM using the API:
       '{repository:"acme/rails-app",artifact_identifier:"git:example",
         format:"cyclonedx",sbom:$sbom[0]}' \
       | curl -fsS -X POST http://localhost:3000/api/v1/inventories \
-          -H "Authorization: Bearer $DEPLOGRAPH_INGEST_TOKEN" \
+          -H "Authorization: Bearer $DEPLOGRAPH_API_TOKEN" \
           -H "Content-Type: application/json" --data-binary @-
+
+
+For the following deployment report, use a separate credential issued with `PROVIDER=github_actions PERMISSIONS=report` for the same organization. The generic `api` token is not allowed to impersonate GitHub Actions.
 
 Report a deployment:
 
     curl -fsS -X POST http://localhost:3000/api/v1/deployments \
-      -H "Authorization: Bearer $DEPLOGRAPH_INGEST_TOKEN" \
+      -H "Authorization: Bearer $DEPLOGRAPH_API_TOKEN" \
       -H "Content-Type: application/json" \
       --data-binary @examples/sample_deployment.json
 
 Create a preview environment:
 
     curl -fsS -X POST http://localhost:3000/api/v1/environment_events \
-      -H "Authorization: Bearer $DEPLOGRAPH_INGEST_TOKEN" \
+      -H "Authorization: Bearer $DEPLOGRAPH_API_TOKEN" \
       -H "Content-Type: application/json" \
       --data-binary @examples/sample_environment_created.json
 
