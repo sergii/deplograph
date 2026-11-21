@@ -477,3 +477,76 @@ Run the full Minitest suite with \`bin/rails test\`, or the new UI/API
 tests with \`bin/rails test test/integration/findings_dashboard_test.rb
 test/integration/findings_api_test.rb\`. The frontend is server-rendered
 Rails/ERB, with no new JavaScript dependencies.
+
+
+## Remediation & verification tracking (stacked PR #10)
+
+PR #10 adds the next piece of the Detect → Investigate → Remediate → Verify
+workflow. **A reported fix remains unverified until independently trustworthy
+runtime evidence is available.** Our current collectors provide partial or
+self-reported evidence, so no code path in this PR automatically sets findings
+to \`resolved\`.
+
+### Operator workflow
+
+1. Open \`/findings/:id\` and record a remediation plan. Include a
+   pull-request URL if useful, but do not put access tokens in that URL.
+2. When work has been deployed or scanned, record a new remediation attempt
+   with \`reported_applied\`, linking the existing deployment ID or advisory
+   scan-run ID. A URL by itself is not proof of application.
+3. Move the finding into \`verification_pending\`.
+4. Collect a new snapshot or deployment observation and run a *new*
+   \`DriftComparison\` for the same repository, ordered environment pair and mode.
+   The system will automatically check pending findings that have recorded
+   applied remediations. You can also check a selected comparison manually.
+5. Inspect the verification history. Every check names its immutable
+   comparison evidence and gives one of:
+   - \`still_affected\`: the same subject remains an actionable finding
+   - \`candidate_clear\`: new, sufficiently complete and provenance-correlated
+     comparison no longer contains the subject; **not verified remediation**
+   - \`inconclusive\`: missing, stale or incomparable evidence
+   - \`policy_changed\`: a policy exception/waiver was introduced instead of
+     demonstrating an actual configuration fix
+
+Checks link the selected \`RemediationAttempt\`, \`DriftComparison\`, trigger
+(manual or new comparison), reason code, and recorded time. These are
+append-only audit artifacts. Repeating a check for the same finding/comparison
+returns the same record, without creating duplicate history.
+
+### Evidence gates
+
+- Deployments must belong to the same application and one of the compared
+  environments. A reported fix is evaluated against the **target** environment,
+  not just staging. Verification requires a newer comparison with matching
+  deployment event ID, immutable artifact identity and observation time.
+- A successful advisory re-scan must refer to an artifact actually deployed
+  to the target environment; the comparison must cite the **same** inventory
+  snapshot and a scan completed after the reported remediation.
+- Comparisons must match the finding's exact application, ordered environment
+  pair and evidence mode. Tenant boundaries are enforced on all linked records.
+- Incomplete SBOM coverage, unscanned/aged OSV results, old observations,
+  unresolved HMAC fingerprints or missing ENV names cannot yield a clean
+  verification decision.
+- Changing a fingerprint policy from \`must_match\` to
+  \`allowed_to_differ\` is a policy change, **not a runtime fix**.
+- Kubernetes/Kamal observations remain partial, even with a matching digest.
+  \`authoritative\` is always false and cannot be set using these endpoints.
+
+### Access and API
+
+Browser remediation and verification actions use logged-in Rails sessions,
+CSRF protection, and owner/admin/member roles. Viewer accounts are read-only.
+The new read-only endpoints require integration-credential \`read\` permission
+for the repository and **both** environments:
+
+    GET /api/v1/findings/:id/remediations
+    GET /api/v1/findings/:id/verifications
+
+No arbitrary token can change remediation state via these read APIs. Values of
+secrets, HMAC secret keys, and raw ENV values are not exposed.
+
+**Remaining production work:** a trusted, independently verifiable runtime
+attestation and explicit coverage contract, a source-verified resolution
+transition, correct handling of later reoccurrences, and at-least-once
+verification scheduling with retries. Avoid treating candidate-clear as a
+security assurance until those are delivered.
