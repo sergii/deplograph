@@ -1,6 +1,10 @@
 Rails.application.routes.draw do
   get "/up", to: proc { [200, { "content-type" => "text/plain" }, ["ok"]] }
   root "dashboard#index"
+  get "/login", to: "sessions#new", as: :login
+  post "/login", to: "sessions#create"
+  delete "/logout", to: "sessions#destroy", as: :logout
+  post "/organizations/:id/select", to: "organizations#select", as: :select_organization
   get "/api/docs", to: "docs#index"
 
   namespace :api do
