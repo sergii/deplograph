@@ -1,0 +1,54 @@
+<%= link_to "← All comparisons", drift_dashboard_path, class: "nav-back" %>
+<div class="topline">
+  <div>
+    <div class="eyebrow">Comparison #<%= @comparison.id %></div>
+    <h1><%= @comparison.application.repository_full_name %></h1>
+    <p class="muted"><%= @comparison.baseline_environment.name %> → <%= @comparison.target_environment.name %> · <%= @comparison.mode.humanize %></p>
+  </div>
+  <span class="pill pill-<%= @comparison.status %>"><%= @comparison.status.humanize %></span>
+</div>
+<div class="metrics">
+  <div class="panel"><div class="muted small">Baseline</div><h2><%= @comparison.baseline_environment.name %></h2></div>
+  <div class="panel"><div class="muted small">Target</div><h2><%= @comparison.target_environment.name %></h2></div>
+  <div class="panel"><div class="muted small">Evidence type</div><h2><%= @comparison.result["verified_runtime"] ? "Verified" : "Not runtime-verified" %></h2></div>
+  <div class="panel"><div class="muted small">Comparison time</div><h2><%= @comparison.compared_at.utc.strftime("%d %b %H:%M UTC") %></h2></div>
+</div>
+<div class="grid-two">
+  <section class="panel">
+    <h2>Evidence by dimension</h2>
+    <% dimensions = @comparison.result.fetch("dimensions", {}) %>
+    <% if dimensions.empty? %><p class="muted">No dimensions available.</p><% end %>
+    <% dimensions.each do |name, info| %>
+      <div style="padding:14px 0;border-bottom:1px solid #e7edf5">
+        <div class="flex">
+          <strong><%= name.humanize %></strong>
+          <% if info.is_a?(Hash) %><span class="pill pill-<%= info["status"] %>"><%= info["status"] %></span><% end %>
+        </div>
+        <% if info.is_a?(Hash) %>
+          <details>
+            <summary class="muted small" style="cursor:pointer;margin-top:8px">View underlying comparison evidence</summary>
+            <pre><%= JSON.pretty_generate(info) %></pre>
+          </details>
+        <% end %>
+      </div>
+    <% end %>
+  </section>
+  <section class="panel">
+    <h2>Findings from this comparison</h2>
+    <% if @findings.empty? %>
+      <div class="empty">No actionable findings extracted from this comparison.</div>
+    <% else %>
+      <% @findings.each do |finding| %>
+        <div style="padding:13px 0;border-bottom:1px solid #e7edf5">
+          <%= link_to finding.title, finding_path(finding) %>
+          <div class="flex" style="margin-top:6px">
+            <span class="pill pill-<%= finding.status %>"><%= finding.status.humanize %></span>
+            <span class="pill pill-<%= finding.priority %>"><%= finding.priority.upcase %></span>
+            <span class="muted small"><%= finding.evidence_quality.humanize %> evidence</span>
+          </div>
+        </div>
+      <% end %>
+    <% end %>
+    <p class="muted small" style="margin-top:16px">Findings are derived from recorded evidence. They are not proof that a fix is running in production.</p>
+  </section>
+</div>
