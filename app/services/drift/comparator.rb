@@ -32,12 +32,14 @@ module Drift
       stale = mode == "observed" && (before[:stale] || after[:stale])
       status = if missing
         "unknown"
+      elsif stale
+        # Old observations are historical evidence, not current runtime drift.
+        "stale"
+      elsif before[:environment].state != "active" || after[:environment].state != "active"
+        "partial"
       elsif known_differences.any?
         "different"
-      elsif stale
-        "stale"
-      elsif unknown.any? || mode == "observed" ||
-            before[:environment].state != "active" || after[:environment].state != "active"
+      elsif unknown.any? || mode == "observed"
         "partial"
       else
         "same"
