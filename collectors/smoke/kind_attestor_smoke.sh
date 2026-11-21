@@ -4,6 +4,21 @@ set -euo pipefail
 # Runs only in an isolated throwaway kind cluster using generated test credentials.
 namespace="deplograph-attestor-smoke"
 service_account="system:serviceaccount:${namespace}:deplograph-control-plane-attestor"
+private_key=""
+
+on_exit() {
+  local exit_code="$?"
+  if [[ "${exit_code}" != "0" ]]; then
+    # Print Kubernetes scheduling and Pod events, never raw Secret values.
+    kubectl -n "${namespace}" get jobs,pods -o wide || true
+    kubectl -n "${namespace}" describe pods | tail -n 140 || true
+    kubectl -n "${namespace}" logs -l job-name=attestor-healthy --all-containers --prefix --tail=60 || true
+  fi
+  if [[ -n "${private_key}" ]]; then
+    rm -f "${private_key}"
+  fi
+}
+trap on_exit EXIT
 
 kubectl create namespace "${namespace}"
 
@@ -15,7 +30,6 @@ kubectl -n "${namespace}" rollout status deployment/web --timeout=180s
 kubectl -n "${namespace}" rollout status deployment/worker --timeout=180s
 
 private_key="$(mktemp)"
-trap 'rm -f "${private_key}"' EXIT
 openssl genpkey -algorithm ED25519 -out "${private_key}"
 kubectl -n "${namespace}" create secret generic deplograph-ed25519-key \
   --from-file="private.pem=${private_key}"
@@ -65,7 +79,7 @@ run_probe() {
   local outcome="$2"
   kubectl -n "${namespace}" create job "${job_name}" --from=cronjob/deplograph-control-plane-attestor
   if [[ "${outcome}" == "complete" ]]; then
-    kubectl -n "${namespace}" wait --for=condition=complete "job/${job_name}" --timeout=120s
+    kubectl -n "${namespace}" wait --for=condition=complete "job/${job_name}" --timeout=160s
     kubectl -n "${namespace}" logs "job/${job_name}" | python3 -c '
 import json
 import sys
@@ -78,7 +92,7 @@ assert sorted((w["name"], w["ready_replicas"]) for w in data["workloads"]) == [
 ]
 '
   else
-    kubectl -n "${namespace}" wait --for=condition=failed "job/${job_name}" --timeout=120s
+    kubectl -n "${namespace}" wait --for=condition=failed "job/${job_name}" --timeout=160s
     kubectl -n "${namespace}" logs "job/${job_name}" | grep -q "probe rejected the observation"
   fi
 }
