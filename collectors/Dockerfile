@@ -1,7 +1,6 @@
-# syntax=docker/dockerfile:1
 # This image has no Rails, database, or external gem dependencies.
-# For production builds, pin the base to an audited immutable @sha256 digest.
-ARG RUBY_BASE_IMAGE=ruby:4.0.10-slim
+# The Ruby base is pinned to an OCI registry manifest digest, not a mutable tag.
+ARG RUBY_BASE_IMAGE=ruby:4.0.10-slim@sha256:a4b3e62bfe56bd267a3aeacc1b89aea96be919faa0c7d77c6346e2ac14f6c175
 FROM ${RUBY_BASE_IMAGE}
 
 WORKDIR /app
