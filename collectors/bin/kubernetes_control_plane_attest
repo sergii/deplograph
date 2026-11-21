@@ -20,7 +20,8 @@ begin
   )
   publisher = Deplograph::RuntimeCollectors::SignedAttestationPublisher.new(
     url: ENV.fetch("DEPLOGRAPH_ATTESTATION_URL"),
-    token: ENV.fetch("DEPLOGRAPH_TOKEN"),
+    token: ENV.key?("DEPLOGRAPH_TOKEN_FILE") ?
+      File.read(ENV.fetch("DEPLOGRAPH_TOKEN_FILE")).strip : ENV.fetch("DEPLOGRAPH_TOKEN"),
     private_key_file: ENV.fetch("DEPLOGRAPH_SIGNING_KEY_FILE"),
     attestor_id: ENV.fetch("DEPLOGRAPH_ATTESTOR_ID"),
     repository: ENV.fetch("DEPLOGRAPH_REPOSITORY"),
