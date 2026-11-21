@@ -98,8 +98,8 @@ class GithubWebhookTest < ActionDispatch::IntegrationTest
 
   private
 
-  def deliver(event, body, delivery_id: SecureRandom.uuid)
-    json = JSON.generate(body)
+  def deliver(event, body = nil, delivery_id: SecureRandom.uuid, **attributes)
+    json = JSON.generate(body || attributes)
     signature = OpenSSL::HMAC.hexdigest("SHA256", ENV.fetch("GITHUB_WEBHOOK_SECRET"), json)
     post "/api/v1/github/webhooks", params: json,
       headers: { "CONTENT_TYPE" => "application/json",
