@@ -81,7 +81,7 @@ class KubernetesControlPlaneAttestorTest < ActiveSupport::TestCase
           parsed = JSON.parse(request.body)
           assertion = parsed.fetch("attestation")
           signature = Base64.strict_decode64(parsed.fetch("signature"))
-          key.public_key.verify(nil, signature,
+          OpenSSL::PKey.read(key.public_to_pem).verify(nil, signature,
             JSON.generate(deep_sort(assertion))) &&
             assertion.fetch("nonce") == "a" * 64 &&
             assertion.fetch("workloads").size == 2 &&
