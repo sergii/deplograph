@@ -5,6 +5,7 @@ module Api
 
       before_action :authenticate_ingestion!
 
+      rescue_from Artifacts::IdentityConflict, with: :identity_conflict
       rescue_from JSON::ParserError, with: :invalid_json
       rescue_from KeyError, ArgumentError, Inventory::Importer::InvalidDocument,
                   ActiveRecord::RecordInvalid, with: :unprocessable
@@ -49,6 +50,10 @@ module Api
 
       def parse_time(value)
         Time.iso8601(value.to_s)
+      end
+
+      def identity_conflict(error)
+        render json: { error: error.message }, status: :conflict
       end
 
       def invalid_json(_error)
