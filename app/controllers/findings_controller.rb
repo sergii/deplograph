@@ -1,6 +1,10 @@
 class FindingsController < ApplicationController
   layout "operations"
 
+  rescue_from ActiveRecord::RecordNotFound do
+    head :not_found
+  end
+
   def index
     @applications = current_organization.applications.order(:name)
     @findings = current_organization.drift_findings
@@ -54,8 +58,6 @@ class FindingsController < ApplicationController
     redirect_to finding_path(finding), notice: "Finding updated"
   rescue Findings::UpdateFinding::TransitionDenied, ActiveRecord::RecordInvalid
     head :unprocessable_entity
-  rescue ActiveRecord::RecordNotFound
-    head :not_found
   end
 
   private
