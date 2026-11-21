@@ -27,6 +27,10 @@ Rails.application.routes.draw do
       resources :drift_comparisons, only: %i[index create show], path: "drift/comparisons"
       resources :configuration_snapshots, only: %i[index create]
       post "configuration/drift", to: "configuration_drifts#create"
+      post "configuration/fingerprints", to: "configuration_fingerprints#create"
+      post "configuration/fingerprints/drift", to: "configuration_fingerprint_drifts#create"
+      get "configuration/policies", to: "configuration_policies#index"
+      put "configuration/policies", to: "configuration_policies#upsert"
       post "integration_events", to: "integration_events#create"
       post "github/webhooks", to: "github_webhooks#create"
     end
