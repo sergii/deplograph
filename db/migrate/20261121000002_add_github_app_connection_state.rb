@@ -1,5 +1,8 @@
 class AddGithubAppConnectionState < ActiveRecord::Migration[8.1]
   def change
+    add_column :applications, :github_repository_id, :bigint
+    add_index :applications, %i[organization_id github_repository_id], unique: true,
+      where: "github_repository_id IS NOT NULL", name: "idx_applications_org_github_repo_id"
     add_reference :github_installations, :linked_by, foreign_key: { to_table: :users }
     add_column :github_installations, :linked_at, :datetime
     add_column :github_installations, :last_synced_at, :datetime
