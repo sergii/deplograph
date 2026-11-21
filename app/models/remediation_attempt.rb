@@ -11,10 +11,17 @@ class RemediationAttempt < ApplicationRecord
   validates :status, inclusion: { in: STATUSES }
   validates :description, presence: true, length: { maximum: 3_000 }
   validates :reference_url, length: { maximum: 2_048 }, allow_nil: true
+  validate :applied_requires_evidence
   validate :same_tenant_evidence
   validate :safe_reference_url
 
   private
+
+  def applied_requires_evidence
+    if status == "reported_applied" && deployment.nil? && vulnerability_scan_run.nil?
+      errors.add(:status, "requires a linked deployment or advisory scan")
+    end
+  end
 
   def same_tenant_evidence
     return unless drift_finding
