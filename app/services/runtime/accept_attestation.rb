@@ -11,6 +11,9 @@ module Runtime
       raise AttestationProtocol::Invalid, "Invalid Ed25519 signature length" unless raw_signature.bytesize == 64
 
       RuntimeAttestation.transaction do
+        # Serialize observation acceptance across attestors for the same environment.
+        # Otherwise an older signed snapshot may resolve a finding after a newer one.
+        attestor.environment.lock!
         challenge.lock!
         raise AttestationProtocol::Replay, "Challenge expired or already consumed" unless
           challenge.runtime_attestor_id == attestor.id && challenge.available?

@@ -653,6 +653,20 @@ An attestor that only reports one pod/replica or a wrong digest can never
 close a finding. Reported deployment evidence alone is still insufficient.
 Manual \`resolved\` remains blocked.
 
+### Signed observation ordering
+
+Valid signatures and fresh challenges are not enough to establish the **latest**
+runtime state. Different collectors or network retries can deliver valid,
+time-bounded snapshots out of order. Deplograph persists such signed evidence
+for audit, but only a snapshot strictly newer than **every prior accepted**
+observation for the same organization/application/environment may trigger
+automatic artifact-drift resolution. Same-timestamp snapshots are ambiguous;
+future-dated observations (within the allowed clock skew) remain informational.
+Acceptance is serialized per environment to make this decision atomic across
+multiple approved attestors. A later observed regression requires fresh
+comparative evidence to reopen a finding, so a signed report alone is not
+a continuous guarantee of cluster state.
+
 ### Threat model and limits
 
 A stolen signing private key and observe credential can forge a report

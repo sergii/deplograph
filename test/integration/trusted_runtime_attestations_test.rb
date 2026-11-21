@@ -220,6 +220,96 @@ class TrustedRuntimeAttestationsTest < ActionDispatch::IntegrationTest
     end
   end
 
+  test "older signed evidence cannot resolve after a newer contradictory attestation" do
+    stage_candidate
+    travel 20.seconds do
+      newer = full_assertion
+      newer["image_digest"] = OLD_DIGEST
+      newer["workloads"].each do |workload|
+        workload["replicas"].each { |replica| replica["image_digest"] = OLD_DIGEST }
+      end
+      result = submit_attestation(assertion: newer)
+      assert_response :created
+      assert_equal true, result.fetch("complete")
+      assert_empty result.fetch("resolutions")
+
+      older = full_assertion
+      older["observed_at"] = 10.seconds.ago.utc.iso8601
+      result = submit_attestation(assertion: older)
+      assert_response :created
+      assert_equal true, result.fetch("complete")
+      assert_empty result.fetch("resolutions")
+      assert_equal 2, RuntimeAttestation.count
+      assert_equal "verification_pending", @finding.reload.status
+      assert_equal 0, FindingResolution.count
+    end
+  end
+
+  test "equal-time signed observations from distinct approved attestors are not ordered" do
+    stage_candidate
+    travel 3.seconds do
+      conflicting = full_assertion
+      conflicting["image_digest"] = OLD_DIGEST
+      conflicting["workloads"].each do |workload|
+        workload["replicas"].each { |replica| replica["image_digest"] = OLD_DIGEST }
+      end
+      submit_attestation(assertion: conflicting)
+      assert_response :created
+
+      backup_key = OpenSSL::PKey.generate_key("ED25519")
+      @attestor = @organization.runtime_attestors.create!(
+        application: @application, environment: @production,
+        integration_credential: @credential, approved_by: @owner,
+        name: "secondary-production-k8s",
+        image_repository: "ghcr.io/acme/payments",
+        expected_workloads: { "web" => 2, "worker" => 1 },
+        public_key_pem: backup_key.public_to_pem, resolution_enabled: true
+      )
+      @key = backup_key
+      same_time = full_assertion
+      assert_equal conflicting["observed_at"], same_time["observed_at"]
+      result = submit_attestation(assertion: same_time)
+      assert_response :created
+      assert_equal true, result.fetch("complete")
+      assert_empty result.fetch("resolutions")
+      assert_equal "verification_pending", @finding.reload.status
+      assert_equal 0, FindingResolution.count
+    end
+  end
+
+  test "newer signed evidence can resolve after an older contradictory attestation" do
+    stage_candidate
+    travel 20.seconds do
+      old = full_assertion
+      old["observed_at"] = 10.seconds.ago.utc.iso8601
+      old["image_digest"] = OLD_DIGEST
+      old["workloads"].each do |workload|
+        workload["replicas"].each { |replica| replica["image_digest"] = OLD_DIGEST }
+      end
+      submit_attestation(assertion: old)
+      assert_response :created
+      assert_equal "verification_pending", @finding.reload.status
+
+      result = submit_attestation
+      assert_response :created
+      assert_equal 1, result.fetch("resolutions").size
+      assert_equal "resolved", @finding.reload.status
+    end
+  end
+
+  test "future-dated signed evidence is accepted but cannot close findings" do
+    stage_candidate
+    travel 3.seconds do
+      assertion = full_assertion
+      assertion["observed_at"] = 20.seconds.from_now.utc.iso8601
+      result = submit_attestation(assertion: assertion)
+      assert_response :created
+      assert_equal true, result.fetch("complete")
+      assert_empty result.fetch("resolutions")
+      assert_equal "verification_pending", @finding.reload.status
+    end
+  end
+
   test "owner can enroll a new public key but cannot bind it to a foreign tenant environment" do
     login(@owner)
     post runtime_attestors_path, params: {
