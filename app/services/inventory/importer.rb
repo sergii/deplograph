@@ -17,9 +17,10 @@ module Inventory
       digest = Digest::SHA256.hexdigest(JSON.generate(document))
 
       InventorySnapshot.transaction do
-        artifact = application.artifacts.find_or_initialize_by(identifier: artifact_identifier)
-        artifact.assign_attributes(kind: kind, image_digest: image_digest, commit_sha: commit_sha)
-        artifact.save!
+        artifact = Artifacts::Registrar.new.call(
+          application: application, identifier: artifact_identifier,
+          kind: kind, image_digest: image_digest, commit_sha: commit_sha
+        )
 
         snapshot = artifact.inventory_snapshots.find_or_initialize_by(sha256: digest)
         next snapshot if snapshot.persisted?
