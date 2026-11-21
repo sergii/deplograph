@@ -5,7 +5,10 @@ module Api
         body = payload
         return unless authorize_integration!(permission: "read", repository: body["repository"])
         app = application_for(body)
-        details = Github::RepositoryInspector.new.call(app.repository_full_name)
+        # Until GitHub App installation tokens are scoped to a tenant, never use
+        # a shared server-side GitHub token to inspect caller-selected repositories.
+        client = Github::ApiClient.new(token: nil)
+        details = Github::RepositoryInspector.new(client: client).call(app.repository_full_name)
         app.update!(repository_metadata: details, inspected_at: Time.current)
 
         render json: details
