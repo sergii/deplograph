@@ -6,7 +6,7 @@ info:
 servers:
   - url: /
 security:
-  - IngestionToken: []
+  - IntegrationCredential: []
 paths:
   /api/v1/inventories:
     post:
@@ -33,7 +33,8 @@ paths:
                   component_count: { type: integer }
                   dependency_count: { type: integer }
                   match_status: { type: string }
-        '401': { description: Unauthorized }
+        '401': { description: Missing, expired or revoked credential }
+        '403': { description: Credential scope or permission denied }
         '409': { description: Artifact identity conflict }
         '422': { description: Invalid import }
   /api/v1/releases:
@@ -100,12 +101,12 @@ paths:
       operationId: ingestIntegrationEvent
       summary: Correlate deployment reports and independent runtime observations
       description: |
-        deployment.reported uses IngestionToken. artifact.observed requires a
-        dedicated, source-bound ObserverToken configured for the collector type.
+        Every request requires an active organization credential. Required permissions
+        are read, report or observe; event source must match credential provider.
+        Repository and environment scopes are enforced before data is accessed.
         Observations are partial evidence, not proof of completed rollout.
       security:
-        - IngestionToken: []
-        - ObserverToken: []
+        - IntegrationCredential: []
       requestBody:
         required: true
         content:
@@ -129,7 +130,7 @@ paths:
         '401': { description: Unauthorized }
         '409': { description: Event or artifact identity conflict }
         '422': { description: Invalid event }
-        '503': { description: Runtime collector credentials are not configured }
+        '403': { description: Credential lacks scope or permission }
   /api/v1/environments:
     get:
       operationId: listEnvironmentExposure
@@ -208,13 +209,10 @@ paths:
         '503': { description: Webhook secret not configured }
 components:
   securitySchemes:
-    IngestionToken:
+    IntegrationCredential:
       type: http
       scheme: bearer
-    ObserverToken:
-      type: http
-      scheme: bearer
-      description: Source-bound runtime collector credential
+      description: Hashed, organization-scoped credential with read/report/observe and optional repository/environment restrictions
   schemas:
     InventoryRequest:
       type: object
@@ -249,7 +247,7 @@ components:
         repository: { type: string }
         environment: { type: string }
         environment_kind: { type: string }
-        source: { type: string, enum: [github_actions, kamal, kubernetes, kamal_agent, docker_agent, aws_ecs] }
+        source: { type: string, enum: [ci, github_actions, kamal, kubernetes, kamal_agent, docker_agent, aws_ecs] }
         event_type: { type: string, enum: [deployment.reported, artifact.observed] }
         event_id: { type: string }
         occurred_at: { type: string, format: date-time }
