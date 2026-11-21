@@ -1,0 +1,12 @@
+<h1>Connect GitHub</h1>
+<p>Choose an installation for <%= current_organization.name %>. The installation ID alone is not trusted. GitHub user authorization must confirm it.</p>
+<% if @installation_id %>
+  <%= button_to "Verify and link installation #{@installation_id}",
+    authorize_github_installation_path, method: :post,
+    params: { installation_id: @installation_id } %>
+<% else %>
+  <p>Install the Deplograph GitHub App in GitHub, then return through its configured Setup URL.</p>
+  <% if ENV["GITHUB_APP_SLUG"].to_s.match?(/\A[a-z0-9-]+\z/) %>
+    <%= link_to "Install GitHub App", "https://github.com/apps/#{ENV["GITHUB_APP_SLUG"]}/installations/new" %>
+  <% end %>
+<% end %>
