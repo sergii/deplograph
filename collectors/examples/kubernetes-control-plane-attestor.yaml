@@ -1,0 +1,93 @@
+# Example only. Deploy after generating a versioned collector container image and
+# distributing the signing private key out-of-band. No real cluster access
+# or public key registration is performed by this sample.
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: deplograph-control-plane-attestor
+  namespace: production
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: deplograph-control-plane-reader
+  namespace: production
+rules:
+  - apiGroups: ["apps"]
+    resources: ["deployments", "replicasets"]
+    verbs: ["get", "list"]
+  - apiGroups: [""]
+    resources: ["pods"]
+    verbs: ["get", "list"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: deplograph-control-plane-reader
+  namespace: production
+roleRef:
+  kind: Role
+  apiGroup: rbac.authorization.k8s.io
+  name: deplograph-control-plane-reader
+subjects:
+  - kind: ServiceAccount
+    name: deplograph-control-plane-attestor
+    namespace: production
+---
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: deplograph-control-plane-attestor
+  namespace: production
+spec:
+  schedule: "*/5 * * * *"
+  concurrencyPolicy: Forbid
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          serviceAccountName: deplograph-control-plane-attestor
+          restartPolicy: Never
+          containers:
+            - name: attestor
+              image: example.invalid/deplograph-control-plane-attestor:REPLACE_ME
+              command: ["ruby", "/app/collectors/bin/kubernetes_control_plane_attest"]
+              env:
+                - name: DEPLOGRAPH_ATTESTATION_URL
+                  value: "https://deplograph.example/api/v1/runtime/attestations"
+                - name: DEPLOGRAPH_REPOSITORY
+                  value: "acme/payments"
+                - name: DEPLOGRAPH_ENVIRONMENT
+                  value: "production"
+                - name: DEPLOGRAPH_NAMESPACE
+                  valueFrom:
+                    fieldRef:
+                      fieldPath: metadata.namespace
+                - name: DEPLOGRAPH_EXPECTED_WORKLOADS
+                  value: '{"web":2,"worker":1}'
+                - name: DEPLOGRAPH_IMAGE_REPOSITORY
+                  value: "ghcr.io/acme/payments"
+                - name: DEPLOGRAPH_ATTESTOR_ID
+                  value: "REPLACE_WITH_REGISTERED_ID"
+                - name: DEPLOGRAPH_TOKEN
+                  valueFrom:
+                    secretKeyRef:
+                      name: deplograph-control-plane-credential
+                      key: token
+                - name: DEPLOGRAPH_SIGNING_KEY_FILE
+                  value: "/run/attestor/private.pem"
+              volumeMounts:
+                - name: private-key
+                  mountPath: "/run/attestor"
+                  readOnly: true
+              securityContext:
+                allowPrivilegeEscalation: false
+                readOnlyRootFilesystem: true
+                runAsNonRoot: true
+                capabilities:
+                  drop: ["ALL"]
+          volumes:
+            - name: private-key
+              secret:
+                secretName: deplograph-ed25519-key
+                defaultMode: 0400
