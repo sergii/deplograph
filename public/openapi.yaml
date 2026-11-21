@@ -256,6 +256,163 @@ paths:
         '403': { description: Environment scope denied }
         '404': { description: Environment not found }
         '422': { description: Invalid comparison }
+  /api/v1/configuration/fingerprints:
+    post:
+      operationId: importEnvValueFingerprints
+      summary: Attach client-computed keyed HMACs to an existing names-only snapshot
+      description: |
+        The server never receives plaintext ENV values or the shared HMAC key.
+        Caller must match the snapshot provider and hold report/observe permission.
+        Fingerprints are accepted only for names in the snapshot, up to ten
+        minutes after the names-only snapshot was collected.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [repository, environment, snapshot_id, key_id, algorithm, fingerprints]
+              properties:
+                repository: { type: string }
+                environment: { type: string }
+                snapshot_id: { type: integer }
+                key_id: { type: string, maxLength: 64 }
+                algorithm: { type: string, const: "HMAC-SHA256-v1" }
+                fingerprints:
+                  type: object
+                  additionalProperties:
+                    type: string
+                    minLength: 64
+                    maxLength: 64
+                  maxProperties: 5000
+      responses:
+        '201':
+          description: Immutable fingerprint batch recorded without returning any digests
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [id, snapshot_id, key_id, algorithm, fingerprint_count, collected_at]
+                properties:
+                  id: { type: integer }
+                  snapshot_id: { type: integer }
+                  key_id: { type: string }
+                  algorithm: { type: string }
+                  fingerprint_count: { type: integer }
+                  collected_at: { type: string, format: date-time }
+        '401': { description: Invalid credential }
+        '403': { description: Provider or scope denied }
+        '404': { description: Snapshot not found }
+        '409': { description: Key ID replay conflict }
+        '422': { description: Non-HMAC, plaintext or invalid fingerprint data }
+  /api/v1/configuration/fingerprints/drift:
+    post:
+      operationId: compareEnvValueFingerprints
+      summary: Compare HMAC evidence under per-variable policies
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [repository, baseline_environment, target_environment, workload, scope]
+              properties:
+                repository: { type: string }
+                baseline_environment: { type: string }
+                target_environment: { type: string }
+                workload: { type: string }
+                scope: { type: string, enum: [declared, process] }
+      responses:
+        '201':
+          description: New evidence-qualified comparison
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [id, status, result]
+                properties:
+                  id: { type: integer }
+                  status: { type: string, enum: [same, different, partial, unknown, stale] }
+                  result: { type: object }
+        '401': { description: Invalid credential }
+        '403': { description: Scope denied }
+        '404': { description: Application or environment missing }
+        '422': { description: Invalid comparison }
+  /api/v1/configuration/policies:
+    get:
+      operationId: listEnvValuePolicies
+      parameters:
+        - name: repository
+          in: query
+          required: true
+          schema: { type: string }
+        - name: baseline_environment
+          in: query
+          required: true
+          schema: { type: string }
+        - name: target_environment
+          in: query
+          required: true
+          schema: { type: string }
+      responses:
+        '200':
+          description: Scoped policy listing
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [policies]
+                properties:
+                  policies: { type: array, items: { type: object } }
+        '401': { description: Invalid credential }
+        '403': { description: Scope denied }
+        '404': { description: Application missing }
+    put:
+      operationId: upsertEnvValuePolicy
+      summary: Set or update an audited ENV comparison rule
+      description: |
+        Requires manage permission for both environments.
+        The default rule for keys without a policy is must_match.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [repository, baseline_environment, target_environment, workload, scope, name, rule]
+              properties:
+                repository: { type: string }
+                baseline_environment: { type: string }
+                target_environment: { type: string }
+                workload: { type: string }
+                scope: { type: string, enum: [declared, process] }
+                name: { type: string }
+                rule: { type: string, enum: [must_match, must_differ, allowed_to_differ, ignore] }
+      responses:
+        '200':
+          description: Policy stored; changes are audited
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [id, repository, baseline_environment, target_environment, name, workload, scope, rule, updated_at]
+                properties:
+                  id: { type: integer }
+                  repository: { type: string }
+                  baseline_environment: { type: string }
+                  target_environment: { type: string }
+                  name: { type: string }
+                  workload: { type: string }
+                  scope: { type: string }
+                  rule: { type: string }
+                  updated_at: { type: string, format: date-time }
+        '401': { description: Invalid credential }
+        '403': { description: Missing manage permission }
+        '404': { description: Application or environment missing }
+        '422': { description: Invalid rule or scope }
   /api/v1/releases:
     post:
       operationId: registerRelease
@@ -448,7 +605,7 @@ components:
           required: [status, mode, verified_runtime, confidence, known_differences, incomplete_dimensions, baseline, target, dimensions]
           properties:
             status: { type: string }
-            mode: { type: string, enum: [reported, observed] }
+            mode: { type: string, enum: [reported, observed, configuration_names, configuration_fingerprints] }
             verified_runtime: { type: boolean, const: false }
             confidence: { type: string, enum: [partial, reported_only] }
             known_differences: { type: array, items: { type: string } }
