@@ -49,8 +49,8 @@ class DriftDashboardController < ApplicationController
   private
 
   def can_triage?
-    current_user.memberships.find_by(organization_id: current_organization.id)&.role.in?(
-      %w[owner admin member]
+    %w[owner admin member].include?(
+      current_user.memberships.find_by(organization_id: current_organization.id)&.role
     )
   end
   helper_method :can_triage?
