@@ -4,7 +4,7 @@ class DriftComparison < ApplicationRecord
   belongs_to :baseline_environment, class_name: "Environment"
   belongs_to :target_environment, class_name: "Environment"
 
-  validates :mode, inclusion: { in: %w[reported observed configuration_names] }
+  validates :mode, inclusion: { in: %w[reported observed configuration_names configuration_fingerprints] }
   validates :status, inclusion: { in: %w[same different partial unknown stale] }
   validates :compared_at, presence: true
   validate :all_resources_belong_to_organization

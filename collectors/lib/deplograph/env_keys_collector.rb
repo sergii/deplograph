@@ -57,7 +57,7 @@ module Deplograph
         @token, @repository, @environment = token, repository, environment
       end
 
-      def send_snapshot(snapshot)
+      def send_snapshot(snapshot, return_id: false)
         body = JSON.generate(snapshot.merge(
           "repository" => @repository, "environment" => @environment
         ))
@@ -70,6 +70,8 @@ module Deplograph
         response = Net::HTTP.start(@uri.host, @uri.port, use_ssl: @uri.scheme == "https",
           open_timeout: 5, read_timeout: 15) { |http| http.request(request) }
         raise Error, "Configuration snapshot rejected: HTTP #{response.code}" unless response.code.to_i == 201
+
+        return JSON.parse(response.body).fetch("id") if return_id
 
         true
       end

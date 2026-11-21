@@ -93,3 +93,23 @@ For declared configuration, \`POST /api/v1/configuration_snapshots\` with
 Collect only names from a trusted config parser, never raw values.
 \`envFrom\` references and external secret stores can make declared key
 coverage partial unless resolved independently with appropriate access.
+
+
+## Opt-in HMAC value fingerprints (PR #8)
+
+Run \`ruby collectors/bin/env_fingerprints_observe\` explicitly only in the
+process context whose variables you intend to compare. It uses \`ENV.keys\`
+plus local HMAC-SHA256 over the selected values, then sends only names and
+hexadecimal keyed fingerprints through two HTTPS API requests.
+
+Provide the collector settings from the root README and a key file at
+\`DEPLOGRAPH_HMAC_KEY_FILE\`, plus a stable \`DEPLOGRAPH_HMAC_KEY_ID\`.
+The file must contain at least 32 random bytes. Never pass the secret in
+command-line arguments or commit it. Securely distribute the **same** key to
+environments you compare. Rotate by changing both the file and key ID.
+
+This script reports \`completeness=partial\`: when run outside the target
+application process, results say nothing authoritative about its ENV values.
+It does not attempt to read other processes, Docker secrets, Kubernetes
+Secrets, or remote stores. Any legitimate production collector must be
+explicitly integrated into the application execution context.

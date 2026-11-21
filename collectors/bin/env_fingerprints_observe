@@ -1,0 +1,30 @@
+#!/usr/bin/env ruby
+# frozen_string_literal: true
+
+require_relative "../lib/deplograph/env_fingerprint_collector"
+
+begin
+  collector = Deplograph::RuntimeCollectors::EnvFingerprintCollector.new(
+    env: ENV, source: ENV.fetch("DEPLOGRAPH_COLLECTOR_SOURCE"),
+    workload: ENV.fetch("DEPLOGRAPH_WORKLOAD"),
+    repository: ENV.fetch("DEPLOGRAPH_REPOSITORY"),
+    key_id: ENV.fetch("DEPLOGRAPH_HMAC_KEY_ID"),
+    key_file: ENV.fetch("DEPLOGRAPH_HMAC_KEY_FILE")
+  )
+  publisher = Deplograph::RuntimeCollectors::EnvFingerprintPublisher.new(
+    names_url: ENV.fetch("DEPLOGRAPH_CONFIG_URL"),
+    token: ENV.fetch("DEPLOGRAPH_TOKEN"),
+    repository: ENV.fetch("DEPLOGRAPH_REPOSITORY"),
+    environment: ENV.fetch("DEPLOGRAPH_ENVIRONMENT")
+  )
+  collection = collector.collect
+  snapshot_id = publisher.publish(collection)
+
+  puts JSON.generate({ status: "submitted", snapshot_id: snapshot_id,
+    fingerprint_count: collection.fetch(:fingerprint_batch).fetch("fingerprints").size,
+    plaintext_uploaded: false, evidence_scope: "process", completeness: "partial" })
+rescue KeyError, Deplograph::RuntimeCollectors::Error => error
+  # Do not print secret values, request bodies, HMAC bytes or key contents.
+  warn "Fingerprint collection failed: #{error.class}"
+  exit 1
+end
