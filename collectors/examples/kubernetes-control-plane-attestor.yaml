@@ -48,6 +48,11 @@ spec:
         spec:
           serviceAccountName: deplograph-control-plane-attestor
           restartPolicy: Never
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 65534
+            runAsGroup: 65534
+            fsGroup: 65534
           containers:
             - name: attestor
               image: example.invalid/deplograph-control-plane-attestor:REPLACE_ME
@@ -90,4 +95,4 @@ spec:
             - name: private-key
               secret:
                 secretName: deplograph-ed25519-key
-                defaultMode: 0400
+                defaultMode: 0440
