@@ -26,7 +26,7 @@ module Github
     end
 
     def installation_token(id, repository_ids: nil)
-      data = { permissions: { contents: "read", metadata: "read" } }
+      data = { permissions: { contents: "read" } }
       data[:repository_ids] = repository_ids if repository_ids&.any?
       response = HttpClient.new(token: app_jwt)
         .post("/app/installations/#{Integer(id)}/access_tokens", data)
