@@ -77,7 +77,7 @@ The SBOM workflow runs on pushes to main or manually. It uses Syft via anchore/s
 
 The deployment-report workflow provides an explicit workflow_dispatch action to report an existing deployment for production, staging, sandbox, test or preview. This workflow does not deploy anything. In GitHub Settings > Environments, configure protection rules for sensitive environment names.
 
-The GitHub inspector currently uses unauthenticated public GitHub REST requests, with a safe manifest allowlist. It deliberately does not use a shared server-side GitHub token for caller-selected repositories. Private repository access and asynchronous SBOM reports require a tenant-bound GitHub App installation (next PR).
+The GitHub inspector uses anonymous REST requests for public repositories, or a one-repository-scoped GitHub App installation token for a verified tenant grant. A shared server-side GitHub token is never forwarded to a caller-selected repository. GitHub SBOM reports are processed using GitHub's asynchronous export API.
 
 ## Matching with OSV
 
@@ -139,10 +139,7 @@ Creation and revocation are recorded in IntegrationAuditEvent.
 Existing application records are migrated into a locked legacy-unclaimed organization
 for manual review, not granted to a newly created user.
 
-**Still out of scope:** GitHub OAuth and actual GitHub App installation token flow.
-Signed installation webhooks are recorded but are not yet joined to an organization.
-The tenant-facing repository inspector does NOT use a shared server-side GitHub token. It is public-repository-only until the GitHub App integration exists.
-Do not treat it as a complete per-installation GitHub permission boundary.
+**Still out of scope:** GitHub account sign-in/SSO and persistent user-side GitHub access. The GitHub OAuth flow in PR #3 is only used to prove installation ownership and associate an installation with an existing Deplograph organization. Short-lived installation tokens authorize per-repository reads. Without configured GitHub App credentials, only public repository inspection is available.
 Additional hardening before public deployment includes TLS, provider OIDC, rate limits,
 password recovery and scoped management UI.
 
