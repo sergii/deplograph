@@ -24,6 +24,7 @@ Rails.application.routes.draw do
       post "repositories/inspect", to: "repositories#inspect"
       resources :releases, only: %i[index create]
       resources :environments, only: :index
+      resources :drift_comparisons, only: %i[index create show], path: "drift/comparisons"
       post "integration_events", to: "integration_events#create"
       post "github/webhooks", to: "github_webhooks#create"
     end
