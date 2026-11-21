@@ -35,7 +35,8 @@ sed -e "s/namespace: production/namespace: ${namespace}/g" \
 kubectl -n "${namespace}" patch cronjob deplograph-control-plane-attestor --type=json -p='[
   {"op":"replace","path":"/spec/jobTemplate/spec/template/spec/containers/0/command",
    "value":["ruby","/app/collectors/bin/kubernetes_control_plane_probe"]},
-  {"op":"replace","path":"/spec/jobTemplate/spec/backoffLimit","value":0}
+  {"op":"replace","path":"/spec/jobTemplate/spec/backoffLimit","value":0},
+  {"op":"add","path":"/spec/suspend","value":true}
 ]'
 
 [[ "$(kubectl auth can-i list pods --as="${service_account}" -n "${namespace}")" == "yes" ]]
@@ -55,7 +56,7 @@ pods = json.load(sys.stdin)["items"]
 ids = [status.get("imageID", "") for pod in pods
        for status in pod.get("status", {}).get("containerStatuses", [])]
 assert len(pods) == 3 and len(ids) == 3, "Expected three healthy workload containers"
-manifest = r"(?:docker-pullable://)?registry\\.k8s\\.io/pause@sha256:[a-f0-9]{64}"
+manifest = r"(?:docker-pullable://)?registry\.k8s\.io/pause@sha256:[a-f0-9]{64}"
 print("registry-manifest" if all(re.fullmatch(manifest, value) for value in ids) else "opaque")
 ')"
 
