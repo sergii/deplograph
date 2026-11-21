@@ -54,6 +54,32 @@ module Vulnerabilities
       assert_equal "GHSA-simulation", @snapshot.vulnerability_matches.first.vulnerability.identifier
     end
 
+    test "new advisory triggers a finding on unchanged inventory without a new deployment" do
+      calls = 0
+      stub_request(:post, OsvClient::API_URL).to_return do |request|
+        calls += 1
+        queries = JSON.parse(request.body).fetch("queries")
+        { status: 200, body: JSON.generate(results: queries.map do |query|
+          purl = query.fetch("package").fetch("purl")
+          { vulns: calls >= 2 && purl.include?("rack") ?
+            [{ id: "GHSA-new-disclosure" }] : [] }
+        end) }
+      end
+
+      MatchSnapshotJob.perform_now(@snapshot.id, trigger: "new_inventory")
+      assert_equal "completed", @snapshot.reload.match_status
+      assert_equal 0, @snapshot.vulnerability_matches.where(source: "osv").count
+
+      MatchSnapshotJob.perform_now(@snapshot.id, trigger: "advisory_update")
+      assert_equal 1, @snapshot.vulnerability_matches.where(source: "osv").count
+      assert_equal 2, @snapshot.vulnerability_scan_runs.count
+      assert_equal %w[new_inventory advisory_update],
+        @snapshot.vulnerability_scan_runs.order(:id).pluck(:trigger)
+      assert_equal [0, 1], @snapshot.vulnerability_scan_runs.order(:id).pluck(:match_count)
+      assert_equal 1, InventorySnapshot.count
+      assert_equal 0, Deployment.count
+    end
+
     test "failed matching is not represented as safe" do
       stub_request(:post, OsvClient::API_URL).to_return(status: 503)
       assert_raises(OsvClient::QueryError) do
