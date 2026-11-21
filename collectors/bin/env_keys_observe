@@ -1,0 +1,24 @@
+#!/usr/bin/env ruby
+# frozen_string_literal: true
+
+require_relative "../lib/deplograph/env_keys_collector"
+
+begin
+  source = ENV.fetch("DEPLOGRAPH_COLLECTOR_SOURCE")
+  collector = Deplograph::RuntimeCollectors::EnvKeysCollector.new(
+    env: ENV, source: source, workload: ENV.fetch("DEPLOGRAPH_WORKLOAD")
+  )
+  client = Deplograph::RuntimeCollectors::EnvKeysEmitter.new(
+    url: ENV.fetch("DEPLOGRAPH_CONFIG_URL"),
+    token: ENV.fetch("DEPLOGRAPH_TOKEN"),
+    repository: ENV.fetch("DEPLOGRAPH_REPOSITORY"),
+    environment: ENV.fetch("DEPLOGRAPH_ENVIRONMENT")
+  )
+  snapshot = collector.collect
+  client.send_snapshot(snapshot)
+  puts JSON.generate({ source: source, keys_submitted: snapshot.fetch("keys").length,
+                       scope: "process", completeness: "partial" })
+rescue KeyError, Deplograph::RuntimeCollectors::Error => error
+  warn "ENV key collection failed: #{error.class}: #{error.message}"
+  exit 1
+end

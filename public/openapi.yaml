@@ -140,6 +140,122 @@ paths:
         '401': { description: Missing or revoked credential }
         '403': { description: Environment scope denied }
         '404': { description: Comparison not found }
+  /api/v1/configuration_snapshots:
+    post:
+      operationId: importEnvNames
+      summary: Store an ENV names-only configuration snapshot
+      description: Only key names are accepted. Values and unknown request properties are rejected.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [repository, environment, source, scope, workload, collection_id, completeness, collected_at, keys]
+              properties:
+                repository: { type: string }
+                environment: { type: string }
+                source: { type: string }
+                scope: { type: string, enum: [declared, process] }
+                workload: { type: string }
+                collection_id: { type: string }
+                completeness: { type: string, enum: [complete, partial] }
+                collected_at: { type: string, format: date-time }
+                keys:
+                  type: array
+                  uniqueItems: true
+                  maxItems: 5000
+                  items:
+                    type: string
+                    pattern: "^[A-Za-z_][A-Za-z0-9_]{0,127}$"
+      responses:
+        '201':
+          description: Snapshot stored
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [id, environment, workload, scope, completeness, collected_at, key_count, keys_sha256]
+                properties:
+                  id: { type: integer }
+                  environment: { type: string }
+                  workload: { type: string }
+                  scope: { type: string }
+                  completeness: { type: string }
+                  collected_at: { type: string, format: date-time }
+                  key_count: { type: integer }
+                  keys_sha256: { type: string }
+        '401': { description: Invalid credential }
+        '403': { description: Missing provider or environment permission }
+        '409': { description: Conflicting collection ID }
+        '422': { description: Invalid or value-bearing payload }
+    get:
+      operationId: listEnvNameSnapshots
+      parameters:
+        - name: repository
+          in: query
+          required: true
+          schema: { type: string }
+        - name: environment
+          in: query
+          required: true
+          schema: { type: string }
+        - name: workload
+          in: query
+          schema: { type: string }
+        - name: scope
+          in: query
+          schema: { type: string, enum: [declared, process] }
+      responses:
+        '200':
+          description: Scoped names-only snapshots
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [snapshots]
+                properties:
+                  snapshots:
+                    type: array
+                    items: { type: object }
+        '401': { description: Invalid credential }
+        '403': { description: Environment scope denied }
+        '404': { description: Environment not found }
+  /api/v1/configuration/drift:
+    post:
+      operationId: compareEnvNames
+      summary: Compare ENV key name sets between environments
+      description: Matching workload, scope and source are required. Partial evidence never proves absence.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [repository, baseline_environment, target_environment, scope, workload]
+              properties:
+                repository: { type: string }
+                baseline_environment: { type: string }
+                target_environment: { type: string }
+                scope: { type: string, enum: [declared, process] }
+                workload: { type: string }
+      responses:
+        '201':
+          description: Persisted configuration drift result
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [id, status, result]
+                properties:
+                  id: { type: integer }
+                  status: { type: string, enum: [same, different, partial, unknown, stale] }
+                  result: { type: object }
+        '401': { description: Invalid credential }
+        '403': { description: Environment scope denied }
+        '404': { description: Environment not found }
+        '422': { description: Invalid comparison }
   /api/v1/releases:
     post:
       operationId: registerRelease

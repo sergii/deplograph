@@ -283,6 +283,60 @@ image**. Build provenance and image digest linkage must be verified in a later
 increment. This avoids attributing source-only vulnerabilities to a deployed
 image without evidence.
 
-ENV-variable name drift, keyed value fingerprints, expected-difference
-policies, complete collector coverage and verified remediation are deliberately
-left for future PRs.
+ENV variable **names-only drift** is now supported in PR #7. Keyed value fingerprints,
+expected-difference policies, complete collector coverage and verified remediation
+remain future work.
+
+
+## ENV Names Drift (stacked PR #7)
+
+Deplograph can now compare the **number and names** of environment variables
+between staging, production or any other pair of environments **without
+collecting their values**.
+
+The collection API accepts strictly:
+\`repository\`, \`environment\`, \`source\`, \`scope\`, \`workload\`, \`collection_id\`,
+\`completeness\`, \`collected_at\` and \`keys\` (array of names only).
+It rejects extra fields including \`values\`, duplicate keys, and any key
+containing an equals sign or an embedded value.
+
+- \`POST /api/v1/configuration_snapshots\`: upload names-only snapshot with
+  provider-bound credentials. \`scope=declared\` requires \`report\`; \`scope=process\`
+  requires \`observe\`.
+- \`GET /api/v1/configuration_snapshots?repository=acme/payments&environment=staging\`:
+  view snapshots and keys, with environment- and tenant-scoped \`read\` permission.
+- \`POST /api/v1/configuration/drift\`: compare matching workload, scope and
+  source, then persist result in existing DriftComparison history.
+- \`GET /api/v1/drift/comparisons/:id\`: read that comparison later.
+
+You can import synthetic declared inventories from
+\`examples/scenarios/configuration-names/staging.json\` and \`production.json\`
+using a scoped \`github_actions\` reporter token. Refresh their \`collected_at\`
+timestamps when testing current-state comparisons.
+
+Example comparison request:
+
+    curl -X POST http://localhost:3000/api/v1/configuration/drift \
+      -H "Authorization: Bearer $DEPLOGRAPH_API_TOKEN" \
+      -H "Content-Type: application/json" \
+      -d '{"repository":"acme/payments","baseline_environment":"staging","target_environment":"production","workload":"web","scope":"declared"}'
+
+The result includes key counts, common names, only-in-baseline,
+only-in-target, both snapshot IDs, collection timestamps and completeness.
+An equal key count is **not** proof that two sets are equal. If one snapshot
+is partial, absence of a key is not asserted, even when the known key
+sets differ. Old snapshots return \`stale\` and non-comparable sources return
+\`unknown\`.
+
+The one-shot \`collectors/bin/env_keys_observe\` uses **only \`ENV.keys\`**
+inside its *own* executing Ruby process and skips collector-specific
+\`DEPLOGRAPH_*\` keys. It sends no values. Because this is the collector
+process's environment, not evidence of the main app process's effective
+state, it always reports \`completeness=partial\`. It must not be run in an
+unrelated CronJob and interpreted as the app's ENV. Future runtime
+instrumentation can report a directly observed process's exact key set.
+
+ENV names themselves may contain sensitive architecture information.
+Keep read permissions narrow. Value HMACs, explicit policies like
+\`must_match/must_differ/ignore\`, and actual secret values are **not**
+implemented here.
