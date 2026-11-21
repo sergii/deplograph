@@ -7,7 +7,7 @@ class SessionsController < ApplicationController
 
   def create
     user = User.find_by(email: params[:email].to_s.strip.downcase)
-    user = user&.authenticate(params[:password].to_s)
+    user = user&.authenticate(params[:password].to_s) || nil
     membership = user&.memberships&.order(:id)&.first
 
     unless user && membership
