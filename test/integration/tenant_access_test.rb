@@ -74,6 +74,24 @@ class TenantAccessTest < ActionDispatch::IntegrationTest
     assert_equal 1, @first.applications.count
   end
 
+  test "repository inspector does not forward shared GitHub credentials to tenant-selected repos" do
+    previous = ENV["GITHUB_TOKEN"]
+    ENV["GITHUB_TOKEN"] = "shared-server-token-must-never-be-used"
+
+    request = stub_request(:get, "https://api.github.com/repos/private-org/private-app")
+      .with { |incoming| incoming.headers["Authorization"].nil? }
+      .to_return(status: 404, body: '{"message":"Not Found"}')
+
+    post "/api/v1/repositories/inspect",
+      params: JSON.generate(repository: "private-org/private-app"),
+      headers: bearer_headers(@first_token)
+
+    assert_response :bad_gateway
+    assert_requested request
+  ensure
+    ENV["GITHUB_TOKEN"] = previous
+  end
+
   test "read-only credential cannot report and reporter cannot read" do
     reader = issue_test_token(organization: @first, permissions: %w[read])
     reporter = issue_test_token(organization: @first, permissions: %w[report])
