@@ -222,7 +222,7 @@ class TrustedRuntimeAttestationsTest < ActionDispatch::IntegrationTest
 
   test "older signed evidence cannot resolve after a newer contradictory attestation" do
     stage_candidate
-    travel 3.seconds do
+    travel 20.seconds do
       newer = full_assertion
       newer["image_digest"] = OLD_DIGEST
       newer["workloads"].each do |workload|
@@ -279,7 +279,7 @@ class TrustedRuntimeAttestationsTest < ActionDispatch::IntegrationTest
 
   test "newer signed evidence can resolve after an older contradictory attestation" do
     stage_candidate
-    travel 3.seconds do
+    travel 20.seconds do
       old = full_assertion
       old["observed_at"] = 10.seconds.ago.utc.iso8601
       old["image_digest"] = OLD_DIGEST
