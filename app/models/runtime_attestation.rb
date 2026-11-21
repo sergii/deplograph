@@ -1,7 +1,7 @@
 class RuntimeAttestation < ApplicationRecord
   belongs_to :runtime_attestor
   belongs_to :runtime_attestation_challenge
-  has_many :finding_resolutions, dependent: :restrict_with_error
+  has_many :finding_resolutions, dependent: :destroy
 
   validates :observation_id, presence: true,
     uniqueness: { scope: :runtime_attestor_id }
