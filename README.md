@@ -239,3 +239,50 @@ you must schedule this task and run a durable background queue before
 production. A scan failure retains the last successful OSV evidence but
 marks the current scan as failed, never as "no vulnerabilities".
 OSV/CVE/GHSA alias normalization and broader advisory feeds remain future work.
+
+
+## Environment drift comparison (stacked PR #5)
+
+The first Drift Engine uses existing data from CI-declared deployments, release
+artifacts, SBOM component versions and OSV results. It does **not** claim to
+verify a complete production rollout.
+
+With a scoped API credential containing \`read\` permission for both environments:
+
+    curl -X POST http://localhost:3000/api/v1/drift/comparisons \
+      -H "Authorization: Bearer $DEPLOGRAPH_API_TOKEN" \
+      -H "Content-Type: application/json" \
+      -d '{"repository":"acme/payments","baseline_environment":"staging","target_environment":"production","mode":"reported"}'
+
+Read a comparison later via \`GET /api/v1/drift/comparisons/:id\`, or list
+authorized history via \`GET /api/v1/drift/comparisons?repository=acme/payments\`.
+Results preserve the release, artifact identity, evidence event and inventory
+snapshot IDs that were used. A new comparison is a new historical record.
+
+Current dimensions:
+
+- \`release\`: logical release name from the latest deployment report.
+- \`artifact\`: reported image digest or source artifact identity.
+- \`dependencies\`: added, removed and version-changed package families from
+  available per-artifact inventory snapshots.
+- \`security\`: advisories observed only in one environment, shared findings,
+  plus OSV scan timestamps and freshness.
+- \`workloads\`: when \`mode=observed\`, the workloads actually seen by partial
+  runtime observations, not an authoritative complete workload list.
+
+\`mode=reported\` compares declarations and is **not** verified runtime state.
+\`mode=observed\` uses latest observations by workload and always remains
+partial evidence until real collector coverage semantics exist.
+Missing SBOMs or unscanned advisories produce \`unknown\`; aged scans can
+produce \`stale\`; incomplete scope produces \`partial\`. Known differences can
+still be reported even when confidence is partial. The response never
+represents \`unknown\` as \`same\`.
+
+An SBOM only on a source lockfile is **not automatically assigned to a built
+image**. Build provenance and image digest linkage must be verified in a later
+increment. This avoids attributing source-only vulnerabilities to a deployed
+image without evidence.
+
+ENV-variable name drift, keyed value fingerprints, expected-difference
+policies, complete collector coverage and verified remediation are deliberately
+left for future PRs.
