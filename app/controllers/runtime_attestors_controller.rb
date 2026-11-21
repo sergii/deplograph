@@ -10,6 +10,7 @@ class RuntimeAttestorsController < ApplicationController
       :application, :environment, :integration_credential, :approved_by
     ).order(created_at: :desc)
     @applications = current_organization.applications.order(:name)
+    @environments = @applications.flat_map { |app| app.environments.order(:name).to_a }
     @credentials = current_organization.integration_credentials.where(provider: "kubernetes")
       .select { |credential| credential.active? && credential.permissions.include?("observe") }
   end
