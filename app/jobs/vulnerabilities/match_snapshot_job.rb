@@ -10,7 +10,7 @@ module Vulnerabilities
       matches = OsvClient.new.query_batch(versioned.map { |occ| occ.component.purl })
 
       InventorySnapshot.transaction do
-        snapshot.vulnerability_matches.delete_all
+        snapshot.vulnerability_matches.where(source: "osv").delete_all
 
         versioned.each do |occurrence|
           Array(matches[occurrence.component.purl]).uniq { |row| row["id"] }.each do |entry|
