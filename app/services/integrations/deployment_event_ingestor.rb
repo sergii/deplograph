@@ -102,17 +102,11 @@ module Integrations
 
       identifier = body["artifact_identifier"].presence ||
         (digest ? "oci:#{body.fetch("image")}@#{digest}" : "git:#{body.fetch("commit_sha")}")
-      artifact = app.artifacts.find_or_initialize_by(identifier: identifier)
-      if artifact.persisted? && artifact.image_digest.present? && artifact.image_digest != digest
-        raise Conflict, "Artifact digest mismatch"
-      end
-      artifact.assign_attributes(
+      Artifacts::Registrar.new.call(
+        application: app, identifier: identifier,
         kind: digest ? "image" : "source",
-        image_digest: digest,
-        commit_sha: body["commit_sha"].presence || artifact.commit_sha
+        image_digest: digest, commit_sha: body["commit_sha"]
       )
-      artifact.save!
-      artifact
     end
 
     def resolve_deployment(environment, artifact, release, source, type, body, occurred)
