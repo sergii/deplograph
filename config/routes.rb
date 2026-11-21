@@ -6,6 +6,10 @@ Rails.application.routes.draw do
   delete "/logout", to: "sessions#destroy", as: :logout
   post "/organizations/:id/select", to: "organizations#select", as: :select_organization
   get "/api/docs", to: "docs#index"
+  get "/drift", to: "drift_dashboard#index", as: :drift_dashboard
+  post "/drift/comparisons", to: "drift_dashboard#create", as: :create_browser_comparison
+  get "/drift/comparisons/:id", to: "drift_dashboard#show", as: :drift_comparison
+  resources :findings, only: %i[index show update]
   get "/github/installations", to: "github/installations#index", as: :github_installations
   get "/github/installations/setup", to: "github/installations#setup", as: :github_installation_setup
   post "/github/installations/authorize", to: "github/installations#authorize", as: :authorize_github_installation
@@ -23,6 +27,7 @@ Rails.application.routes.draw do
       post "environment_events", to: "environment_events#create"
       post "repositories/inspect", to: "repositories#inspect"
       resources :releases, only: %i[index create]
+      resources :findings, only: %i[index show]
       resources :environments, only: :index
       resources :drift_comparisons, only: %i[index create show], path: "drift/comparisons"
       resources :configuration_snapshots, only: %i[index create]
