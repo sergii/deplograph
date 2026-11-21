@@ -34,7 +34,14 @@ jobs:
       - uses: ruby/setup-ruby@v1
         with:
           ruby-version: .ruby-version
-          bundler-cache: true
+          bundler-cache: false
+      - name: Resolve dependencies and capture updated lockfile
+        run: |
+          bundle lock --update bcrypt
+          bundle install --jobs 4 --retry 3
+          printf 'BEGIN_DEPLOGRAPH_LOCKFILE='
+          base64 -w0 Gemfile.lock
+          printf '=END_DEPLOGRAPH_LOCKFILE\n'
       - name: Validate Docker Compose configuration
         run: docker compose config --quiet
       - run: bin/rails db:prepare
