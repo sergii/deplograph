@@ -1,0 +1,73 @@
+# Example only: namespace-scoped Pod read access and scheduled collection.
+# Replace image with a versioned image containing Ruby and collectors/ files.
+# Store the Deplograph token in a Kubernetes Secret created out-of-band.
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: deplograph-observer
+  namespace: staging
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: deplograph-pod-reader
+  namespace: staging
+rules:
+  - apiGroups: [""]
+    resources: ["pods"]
+    verbs: ["get", "list"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: deplograph-pod-reader
+  namespace: staging
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: deplograph-pod-reader
+subjects:
+  - kind: ServiceAccount
+    name: deplograph-observer
+    namespace: staging
+---
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: deplograph-runtime-observer
+  namespace: staging
+spec:
+  schedule: "*/5 * * * *"
+  concurrencyPolicy: Forbid
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          serviceAccountName: deplograph-observer
+          restartPolicy: Never
+          containers:
+            - name: observer
+              image: example.invalid/deplograph-runtime-collector:REPLACE_ME
+              command: ["ruby", "/app/collectors/bin/kubernetes_observe"]
+              env:
+                - name: DEPLOGRAPH_URL
+                  value: "https://deplograph.example/api/v1/integration_events"
+                - name: DEPLOGRAPH_NAMESPACE
+                  valueFrom:
+                    fieldRef:
+                      fieldPath: metadata.namespace
+                - name: DEPLOGRAPH_REPOSITORY
+                  value: "acme/payments"
+                - name: DEPLOGRAPH_ENVIRONMENT
+                  value: "staging"
+                - name: DEPLOGRAPH_TOKEN
+                  valueFrom:
+                    secretKeyRef:
+                      name: deplograph-observer-credential
+                      key: token
+              securityContext:
+                allowPrivilegeEscalation: false
+                readOnlyRootFilesystem: true
+                runAsNonRoot: true
+                capabilities:
+                  drop: ["ALL"]

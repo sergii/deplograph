@@ -1,0 +1,34 @@
+#!/usr/bin/env ruby
+# frozen_string_literal: true
+
+require_relative "../lib/deplograph/kubernetes_collector"
+
+begin
+  require "json"
+
+  namespace = ENV.fetch("DEPLOGRAPH_NAMESPACE")
+  source = Deplograph::RuntimeCollectors::KubernetesApi.new(
+    host: ENV.fetch("KUBERNETES_SERVICE_HOST"),
+    port: ENV.fetch("KUBERNETES_SERVICE_PORT", "443").to_i,
+    token_file: ENV.fetch("KUBERNETES_TOKEN_FILE",
+      "/var/run/secrets/kubernetes.io/serviceaccount/token"),
+    ca_file: ENV.fetch("KUBERNETES_CA_FILE",
+      "/var/run/secrets/kubernetes.io/serviceaccount/ca.crt"),
+    selector: ENV["DEPLOGRAPH_POD_SELECTOR"]
+  )
+  collector = Deplograph::RuntimeCollectors::KubernetesCollector.new(
+    namespace: namespace, client: source
+  )
+  client = Deplograph::RuntimeCollectors::Emitter.new(
+    url: ENV.fetch("DEPLOGRAPH_URL"),
+    token: ENV.fetch("DEPLOGRAPH_TOKEN"),
+    repository: ENV.fetch("DEPLOGRAPH_REPOSITORY"),
+    environment: ENV.fetch("DEPLOGRAPH_ENVIRONMENT")
+  )
+  events = collector.collect
+  events.each { |event| client.send_event(event) }
+  puts JSON.generate({ submitted: events.size, source: "kubernetes", coverage: "partial" })
+rescue KeyError, Deplograph::RuntimeCollectors::Error => error
+  warn "Runtime collection failed: #{error.class}: #{error.message}"
+  exit 1
+end

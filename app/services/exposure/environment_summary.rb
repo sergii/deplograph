@@ -48,6 +48,8 @@ module Exposure
         .includes(:vulnerability).map { |match| match.vulnerability.identifier }.uniq.sort : []
       {
         workload: observation.workload,
+        logical_workload: observation.metadata["logical_workload"],
+        instance_id: observation.metadata["instance_id"],
         source: observation.source,
         event_id: observation.event_id,
         image_digest: observation.image_digest,
