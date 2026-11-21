@@ -117,7 +117,15 @@ module Integrations
       end
       return nil if id.blank?
 
-      deployment = environment.deployments.find_or_initialize_by(external_id: id)
+      # Runtime observations may arrive before a deployment report. Do not attach
+      # a transient, invalid deployment to the environment association.
+      deployment = if type == "artifact.observed"
+        environment.deployments.find_by(external_id: id)
+      else
+        environment.deployments.find_or_initialize_by(external_id: id)
+      end
+      return nil unless deployment
+
       if deployment.persisted?
         if type == "deployment.reported" && artifact && deployment.artifact_id != artifact.id
           raise Conflict, "Deployment ID already refers to another artifact"
