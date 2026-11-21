@@ -21,7 +21,8 @@ module Drift
       dimensions["workloads"] = workload_diff(before, after) if mode == "observed"
 
       unknown = dimensions.filter_map do |dimension, values|
-        dimension if %w[unknown stale partial].include?(values.fetch("status"))
+        dimension if %w[unknown stale partial].include?(values.fetch("status")) ||
+          values["inventory_coverage"] == "partial"
       end
       known_differences = dimensions.filter_map do |dimension, values|
         dimension if values.fetch("status") == "different"
