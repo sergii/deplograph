@@ -25,6 +25,8 @@ Rails.application.routes.draw do
       resources :releases, only: %i[index create]
       resources :environments, only: :index
       resources :drift_comparisons, only: %i[index create show], path: "drift/comparisons"
+      resources :configuration_snapshots, only: %i[index create]
+      post "configuration/drift", to: "configuration_drifts#create"
       post "integration_events", to: "integration_events#create"
       post "github/webhooks", to: "github_webhooks#create"
     end
