@@ -128,10 +128,11 @@ docker build --pull -f collectors/Dockerfile \
 docker run --rm --entrypoint ruby deplograph-control-plane-attestor:local --version
 ```
 
-The Dockerfile uses Ruby 4.0.10-slim and only the Ruby standard library. The
-base is **versioned but not immutable by default**. For an audited deployment,
-supply a reviewed `RUBY_BASE_IMAGE=...@sha256:...` at build time and publish
-the resulting image to your registry. Pin the *published attestor image*
+The Dockerfile uses Ruby 4.0.10-slim and only the Ruby standard library.
+Its default base is pinned by a reviewed OCI manifest digest from the image
+verified in CI; for later upgrades, replace it only with an audited
+`RUBY_BASE_IMAGE=...@sha256:...` reference. Publish the resulting image to
+your registry and pin the *published attestor image*
 in `collectors/examples/kubernetes-control-plane-attestor.yaml` with the
 **registry manifest digest**, not a tag or a Docker image config hash.
 A versioned Dockerfile alone does not make builds bit-for-bit reproducible.
