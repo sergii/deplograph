@@ -16,6 +16,23 @@
   <div class="panel"><div class="muted small">First seen</div><h2><%= @finding.first_seen_at.utc.strftime("%d %b %H:%M UTC") %></h2></div>
   <div class="panel"><div class="muted small">Last seen</div><h2><%= @finding.last_seen_at.utc.strftime("%d %b %H:%M UTC") %></h2></div>
 </div>
+<% if @resolutions.any? %>
+  <section class="panel" style="margin-bottom:18px">
+    <h2>Verified artifact resolutions</h2>
+    <p class="muted small">Cryptographically verified observations are accepted only from owner-approved, scoped control-plane keys and a full pinned workload contract. Trusting the observer's execution environment remains an operator responsibility.</p>
+    <% @resolutions.each do |resolution| %>
+      <div class="flex" style="padding:11px 0;border-bottom:1px solid #e7edf5">
+        <span class="pill pill-same">Verified resolution</span>
+        <strong><%= resolution.runtime_attestation.runtime_attestor.name %></strong>
+        <span class="muted small"><%= resolution.resolved_at.utc.strftime("%d %b %H:%M UTC") %></span>
+        <span class="muted small">
+          Signed attestation #<%= resolution.runtime_attestation_id %>,
+          verification check #<%= resolution.finding_verification_check_id %>
+        </span>
+      </div>
+    <% end %>
+  </section>
+<% end %>
 <section class="panel" style="margin-bottom:18px">
   <div class="topline">
     <div>
@@ -120,7 +137,7 @@
       <% end %>
       <p class="muted small" style="margin-top:18px">
         Candidate clear means the issue is no longer present in a fresh, sufficiently complete comparison.
-        It does not certify a finished rollout or change the finding to Resolved.
+        It does not certify a finished rollout. Only separately approved, signed full-coverage control-plane evidence may resolve artifact drift.
       </p>
     </section>
   </div>
