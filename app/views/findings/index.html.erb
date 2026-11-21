@@ -1,0 +1,68 @@
+<div class="topline">
+  <div>
+    <div class="eyebrow">Actionable evidence</div>
+    <h1>Findings</h1>
+    <p class="muted">Track configuration, release, dependency and advisory differences without losing their provenance.</p>
+  </div>
+  <%= link_to "Drift comparisons", drift_dashboard_path, class: "btn" %>
+</div>
+
+<div class="metrics">
+  <div class="panel"><div class="muted small">Unresolved findings</div><div class="metric-number"><%= @total_open %></div></div>
+  <div class="panel"><div class="muted small">Incomplete evidence</div><div class="metric-number"><%= @total_unknown %></div></div>
+  <div class="panel"><div class="muted small">Matching filters</div><div class="metric-number"><%= @findings.size %></div></div>
+</div>
+
+<section class="panel">
+  <h2>Findings register</h2>
+  <%= form_with url: findings_path, method: :get, local: true do |f| %>
+    <div class="filters" style="margin-bottom:20px">
+      <div>
+        <%= f.label :application_id, "Application" %>
+        <%= f.select :application_id, options_from_collection_for_select(@applications, :id, :repository_full_name, params[:application_id]), { include_blank: "All applications" } %>
+      </div>
+      <div>
+        <%= f.label :status, "Status" %>
+        <%= f.select :status, options_for_select(DriftFinding::STATUSES.map { |s| [s.humanize, s] }, params[:status]), { include_blank: "All statuses" } %>
+      </div>
+      <div>
+        <%= f.label :priority, "Priority" %>
+        <%= f.select :priority, options_for_select(DriftFinding::PRIORITIES.map { |p| [p.upcase, p] }, params[:priority]), { include_blank: "All priorities" } %>
+      </div>
+      <div>
+        <%= f.label :severity, "Severity" %>
+        <%= f.select :severity, options_for_select(DriftFinding::SEVERITIES.map { |s| [s.humanize, s] }, params[:severity]), { include_blank: "All severities" } %>
+      </div>
+      <%= f.submit "Apply filters", class: "btn btn-primary" %>
+    </div>
+  <% end %>
+
+  <% if @findings.empty? %>
+    <div class="empty">No findings match these filters. Try another status or open a new comparison.</div>
+  <% else %>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>Finding</th><th>Application / Environments</th><th>Priority</th><th>Status</th><th>Evidence</th><th>Last seen</th></tr></thead>
+        <tbody>
+          <% @findings.each do |finding| %>
+            <tr>
+              <td>
+                <strong><%= link_to finding.title, finding_path(finding) %></strong>
+                <div class="muted small"><%= finding.category.humanize %></div>
+              </td>
+              <td>
+                <%= finding.application.repository_full_name %>
+                <div class="muted small"><%= finding.baseline_environment.name %> → <%= finding.target_environment.name %></div>
+              </td>
+              <td><span class="pill pill-<%= finding.priority %>"><%= finding.priority.upcase %></span></td>
+              <td><span class="pill pill-<%= finding.status %>"><%= finding.status.humanize %></span></td>
+              <td><span class="pill pill-<%= finding.evidence_quality %>"><%= finding.evidence_quality.humanize %></span></td>
+              <td><time datetime="<%= finding.last_seen_at.iso8601 %>"><%= finding.last_seen_at.utc.strftime("%d %b %H:%M") %></time></td>
+            </tr>
+          <% end %>
+        </tbody>
+      </table>
+    </div>
+  <% end %>
+  <p class="muted small" style="margin-top:16px">Shows up to 100 findings ordered by priority and last-seen time. Operational severity is not a CVSS score.</p>
+</section>

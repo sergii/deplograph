@@ -1,0 +1,98 @@
+<%= link_to "← Findings register", findings_path, class: "nav-back" %>
+<div class="topline">
+  <div>
+    <div class="eyebrow">Finding #<%= @finding.id %> · <%= @finding.category.humanize %></div>
+    <h1><%= @finding.title %></h1>
+    <p class="muted"><%= @finding.application.repository_full_name %> · <%= @finding.baseline_environment.name %> → <%= @finding.target_environment.name %></p>
+  </div>
+  <div class="flex">
+    <span class="pill pill-<%= @finding.priority %>"><%= @finding.priority.upcase %></span>
+    <span class="pill pill-<%= @finding.status %>"><%= @finding.status.humanize %></span>
+  </div>
+</div>
+<div class="metrics">
+  <div class="panel"><div class="muted small">Evidence quality</div><h2><%= @finding.evidence_quality.humanize %></h2></div>
+  <div class="panel"><div class="muted small">Severity (operational)</div><h2><%= @finding.severity.humanize %></h2></div>
+  <div class="panel"><div class="muted small">First seen</div><h2><%= @finding.first_seen_at.utc.strftime("%d %b %H:%M UTC") %></h2></div>
+  <div class="panel"><div class="muted small">Last seen</div><h2><%= @finding.last_seen_at.utc.strftime("%d %b %H:%M UTC") %></h2></div>
+</div>
+<div class="grid-two">
+  <section class="panel">
+    <h2>Evidence and next steps</h2>
+    <dl>
+      <dt class="muted small">Latest comparison</dt>
+      <dd style="margin:4px 0 14px"><%= link_to "Comparison ##{@finding.latest_comparison.id}", drift_comparison_path(@finding.latest_comparison) %></dd>
+      <dt class="muted small">Subject</dt>
+      <dd style="margin:4px 0 14px"><code><%= @finding.subject %></code></dd>
+      <dt class="muted small">Assigned owner</dt>
+      <dd style="margin:4px 0 14px"><%= @finding.assigned_to&.email || "Unassigned" %></dd>
+      <dt class="muted small">Next action</dt>
+      <dd style="margin:4px 0 14px"><%= @finding.next_action.presence || "Not defined" %></dd>
+    </dl>
+    <p class="muted small">A newer deployment or reported image digest is not proof of remediation. Set verification pending until independent runtime evidence supports resolution.</p>
+
+    <% if can_triage? %>
+      <h3>Update finding</h3>
+      <%= form_with url: finding_path(@finding), method: :patch, local: true do |f| %>
+        <div class="stack">
+          <div>
+            <%= f.label :status, "Workflow status" %>
+            <%= f.select :status, options_for_select(Findings::UpdateFinding::MUTABLE_STATUSES.map { |s| [s.humanize, s] }, @finding.status) %>
+          </div>
+          <div>
+            <%= f.label :assigned_to_id, "Owner" %>
+            <%= f.select :assigned_to_id, options_from_collection_for_select(@members, :id, :email, @finding.assigned_to_id), { include_blank: "Unassigned" } %>
+          </div>
+          <% if can_classify? %>
+            <div class="grid-two">
+              <div>
+                <%= f.label :priority, "Priority" %>
+                <%= f.select :priority, options_for_select(DriftFinding::PRIORITIES.map { |p| [p.upcase, p] }, @finding.priority) %>
+              </div>
+              <div>
+                <%= f.label :severity, "Operational severity" %>
+                <%= f.select :severity, options_for_select(DriftFinding::SEVERITIES.map { |s| [s.humanize, s] }, @finding.severity) %>
+              </div>
+            </div>
+          <% end %>
+          <div>
+            <%= f.label :next_action, "Next action" %>
+            <%= f.text_area :next_action, value: @finding.next_action, maxlength: 1500, placeholder: "What should happen next?" %>
+          </div>
+          <div>
+            <%= f.label :note, "Decision / investigation note" %>
+            <%= f.text_area :note, maxlength: 2000, placeholder: "Evidence, rationale or review notes" %>
+          </div>
+          <%= f.submit "Save changes", class: "btn btn-primary" %>
+        </div>
+      <% end %>
+    <% end %>
+  </section>
+
+  <section class="panel">
+    <h2>Audit trail</h2>
+    <% if @history.empty? %>
+      <div class="empty">No recorded changes.</div>
+    <% else %>
+      <div class="timeline">
+        <% @history.each do |event| %>
+          <div class="event">
+            <div class="flex">
+              <strong><%= event.action.humanize %></strong>
+              <span class="muted small"><time datetime="<%= event.created_at.iso8601 %>"><%= event.created_at.utc.strftime("%d %b %Y %H:%M UTC") %></time></span>
+            </div>
+            <% if event.actor %><p class="muted small"><%= event.actor.email %></p><% end %>
+            <% if event.from_status || event.to_status %>
+              <p class="small"><%= event.from_status || "New" %> → <%= event.to_status || "Unchanged" %></p>
+            <% end %>
+            <% if event.note.present? %><p style="white-space:pre-wrap"><%= event.note %></p><% end %>
+            <% if event.drift_comparison %>
+              <%= link_to "See comparison ##{event.drift_comparison_id}", drift_comparison_path(event.drift_comparison), class: "small" %>
+            <% end %>
+          </div>
+        <% end %>
+      </div>
+    <% end %>
+    <p class="muted small" style="margin-top:20px">Showing the 100 most recent audit events.</p>
+  </section>
+</div>
