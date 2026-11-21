@@ -2,6 +2,7 @@ require "test_helper"
 
 module Vulnerabilities
   class ScanDueSnapshotsJobTest < ActiveSupport::TestCase
+    include ActiveJob::TestHelper
     setup do
       @old_enabled = ENV["OSV_ENABLED"]
       ENV["OSV_ENABLED"] = "true"
