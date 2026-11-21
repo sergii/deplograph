@@ -22,7 +22,7 @@ jobs:
         if: ${{ vars.DEPLOGRAPH_API_URL != '' }}
         env:
           API_URL: ${{ vars.DEPLOGRAPH_API_URL }}
-          INGEST_TOKEN: ${{ secrets.DEPLOGRAPH_INGEST_TOKEN }}
+          INGEST_TOKEN: ${{ secrets.DEPLOGRAPH_API_TOKEN }}
           REPOSITORY: ${{ github.repository }}
           COMMIT_SHA: ${{ github.sha }}
         run: |
