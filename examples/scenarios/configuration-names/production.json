@@ -1,0 +1,16 @@
+{
+  "repository": "acme/payments",
+  "environment": "production",
+  "source": "github_actions",
+  "scope": "declared",
+  "workload": "web",
+  "collection_id": "production-demo-1",
+  "collected_at": "2026-11-21T12:00:00Z",
+  "completeness": "complete",
+  "keys": [
+    "DATABASE_URL",
+    "REDIS_URL",
+    "PAYMENT_GATEWAY_TOKEN",
+    "LEGACY_API_KEY"
+  ]
+}
