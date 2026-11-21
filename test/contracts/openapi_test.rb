@@ -32,7 +32,8 @@ class OpenapiTest < ActiveSupport::TestCase
         operation = spec.fetch("paths").fetch(path).fetch(method)
         assert operation.fetch("responses").key?(status), "#{method.upcase} #{path} lacks #{status}"
         assert operation.key?("operationId"), "#{method.upcase} #{path} needs operationId"
-        assert Rails.application.routes.recognize_path(path, method: method.to_sym),
+        concrete_path = path.gsub(/\{[^}]+\}/, "42")
+        assert Rails.application.routes.recognize_path(concrete_path, method: method.to_sym),
           "Missing Rails route #{method.upcase} #{path}"
         if path != "/api/v1/github/webhooks"
           assert spec.fetch("security").any?
