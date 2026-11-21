@@ -24,25 +24,27 @@ module Api
           environment: body["environment"], provider: body["source"]
         )
 
-        application = application_for(body)
-        environment = application.environments.find_or_create_by!(
-          name: body.fetch("environment")
-        ) do |record|
-          record.kind = if %w[production staging development test preview].include?(record.name)
-            record.name
-          else
-            "other"
+        snapshot = ApplicationRecord.transaction do
+          application = application_for(body)
+          environment = application.environments.find_or_create_by!(
+            name: body.fetch("environment")
+          ) do |record|
+            record.kind = if %w[production staging development test preview].include?(record.name)
+              record.name
+            else
+              "other"
+            end
           end
+          Configuration::SnapshotRecorder.new.call(
+            environment: environment, source: body.fetch("source"),
+            scope: scope, workload: body.fetch("workload"),
+            collection_id: body.fetch("collection_id"),
+            completeness: body.fetch("completeness"),
+            collected_at: body.fetch("collected_at"), keys: body.fetch("keys")
+          )
         end
-        snapshot = Configuration::SnapshotRecorder.new.call(
-          environment: environment, source: body.fetch("source"),
-          scope: scope, workload: body.fetch("workload"),
-          collection_id: body.fetch("collection_id"),
-          completeness: body.fetch("completeness"),
-          collected_at: body.fetch("collected_at"), keys: body.fetch("keys")
-        )
         render json: {
-          id: snapshot.id, environment: environment.name,
+          id: snapshot.id, environment: snapshot.environment.name,
           workload: snapshot.workload, scope: snapshot.scope,
           completeness: snapshot.completeness, collected_at: snapshot.collected_at,
           key_count: snapshot.configuration_entries.count,
