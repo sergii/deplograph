@@ -6,6 +6,10 @@ module Api
       def create
         body = payload
         provider = body.fetch("provider", "ci")
+        return unless authorize_integration!(
+          permission: "report", repository: body["repository"],
+          environment: body["environment"], provider: provider
+        )
         identifier = body.fetch("deployment_id")
         raise ArgumentError, "Missing deployment ID" if identifier.blank?
 
@@ -15,7 +19,7 @@ module Api
           "event_type" => "deployment.reported",
           "occurred_at" => body.fetch("deployed_at")
         )
-        event = Integrations::DeploymentEventIngestor.new.call(event_payload)
+        event = Integrations::DeploymentEventIngestor.new.call(event_payload, organization: current_organization)
         deployment = event.deployment
 
         render json: {
