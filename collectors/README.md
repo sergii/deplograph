@@ -67,3 +67,29 @@ The API uses source-bound bearer tokens. A token compromise allows forged
 observations within the token's scope. Consider short-lived signed
 attestations, cluster-specific identity, coverage reports and agent
 heartbeat before any production-grade verification claims.
+
+## ENV names-only collector (PR #7)
+
+\`ruby collectors/bin/env_keys_observe\` collects variable **names only**
+from its own executing Ruby process, using \`ENV.keys\` and excluding
+\`DEPLOGRAPH_*\` collector settings. No variable value is read, hashed,
+logged, transmitted, or persisted.
+
+Required: \`DEPLOGRAPH_CONFIG_URL\` (e.g.
+\`https://deplograph.example/api/v1/configuration_snapshots\`),
+\`DEPLOGRAPH_TOKEN\` with \`observe\`, \`DEPLOGRAPH_COLLECTOR_SOURCE\` in
+\`kubernetes\`, \`kamal_agent\`, \`docker_agent\`,
+\`DEPLOGRAPH_REPOSITORY\`, \`DEPLOGRAPH_ENVIRONMENT\`,
+\`DEPLOGRAPH_WORKLOAD\`.
+
+The collector **does not** read ENV of PID 1 or arbitrary containers and
+always sends \`scope=process\`, \`completeness=partial\`. Run in the
+application's actual configuration context and treat results as
+supplementary. If run in its own Kubernetes CronJob, its variables
+belong to the CronJob, not the application.
+
+For declared configuration, \`POST /api/v1/configuration_snapshots\` with
+\`scope=declared\`, \`source=github_actions\` and a \`report\` token.
+Collect only names from a trusted config parser, never raw values.
+\`envFrom\` references and external secret stores can make declared key
+coverage partial unless resolved independently with appropriate access.
