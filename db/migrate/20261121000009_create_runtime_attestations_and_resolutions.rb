@@ -7,15 +7,14 @@ class CreateRuntimeAttestationsAndResolutions < ActiveRecord::Migration[8.1]
       t.references :integration_credential, null: false, foreign_key: true
       t.references :approved_by, null: false, foreign_key: { to_table: :users }
       t.string :name, null: false
-      t.string :workload, null: false
       t.string :image_repository, null: false
-      t.integer :expected_replicas, null: false
+      t.jsonb :expected_workloads, null: false, default: {}
       t.text :public_key_pem, null: false
       t.boolean :resolution_enabled, null: false, default: false
       t.datetime :revoked_at
       t.timestamps
     end
-    add_index :runtime_attestors, %i[environment_id workload name],
+    add_index :runtime_attestors, %i[environment_id name],
       unique: true, name: "idx_runtime_attestors_identity"
 
     create_table :runtime_attestation_challenges do |t|
