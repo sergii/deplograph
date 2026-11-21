@@ -10,6 +10,10 @@ Rails.application.routes.draw do
   post "/drift/comparisons", to: "drift_dashboard#create", as: :create_browser_comparison
   get "/drift/comparisons/:id", to: "drift_dashboard#show", as: :drift_comparison
   resources :findings, only: %i[index show update]
+  post "/findings/:id/remediations", to: "findings#record_remediation",
+    as: :record_finding_remediation
+  post "/findings/:id/verifications", to: "findings#verify",
+    as: :verify_finding
   get "/github/installations", to: "github/installations#index", as: :github_installations
   get "/github/installations/setup", to: "github/installations#setup", as: :github_installation_setup
   post "/github/installations/authorize", to: "github/installations#authorize", as: :authorize_github_installation
