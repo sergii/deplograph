@@ -3,6 +3,10 @@ module Api
     class InventoriesController < BaseController
       def create
         body = payload
+        return unless authorize_integration!(
+          permission: "report", repository: body["repository"],
+          provider: body.fetch("source", "api")
+        )
         app = application_for(body)
 
         snapshot = Inventory::Importer.new.call(
