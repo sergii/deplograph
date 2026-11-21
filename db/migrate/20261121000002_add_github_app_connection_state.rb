@@ -6,6 +6,7 @@ class AddGithubAppConnectionState < ActiveRecord::Migration[8.1]
     add_column :github_installations, :last_sync_error, :text
 
     add_column :github_repository_grants, :sbom_report_uuid, :string
+    add_column :github_repository_grants, :sbom_requested_at, :datetime
     add_column :github_repository_grants, :sbom_sync_status, :string, null: false, default: "not_requested"
     add_column :github_repository_grants, :last_imported_at, :datetime
     add_column :github_repository_grants, :last_import_error, :text
