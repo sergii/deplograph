@@ -56,16 +56,10 @@ module Findings
         return %w[still_affected issue_still_present]
       end
 
-      return %w[inconclusive newer_remediation_required] unless attempt
-      return %w[inconclusive comparison_precedes_remediation] unless
-        comparison.compared_at > attempt.created_at
-
-      return %w[inconclusive missing_target_evidence] unless
-        target_evidence?(finding, attempt, comparison)
-
       dimension = relevant_dimension(finding, comparison)
       return %w[inconclusive no_comparable_evidence] unless dimension.is_a?(Hash)
 
+      # Changing a rule to ignore the problem is not a technical remediation.
       if finding.category == "policy_violation"
         current = Array(dimension["comparisons"]).find do |entry|
           entry.is_a?(Hash) && entry["name"] == finding.subject
@@ -83,6 +77,14 @@ module Findings
           current["evaluation"] == "compliant"
       end
 
+      return %w[inconclusive newer_remediation_required] unless attempt
+      return %w[inconclusive comparison_precedes_remediation] unless
+        comparison.compared_at > attempt.created_at &&
+          comparison.compared_at <= Time.current + 30.seconds
+
+      return %w[inconclusive missing_target_evidence] unless
+        target_evidence?(finding, attempt, comparison, dimension)
+
       return %w[inconclusive old_or_stale_evidence] if
         comparison.status == "stale" || dimension["status"] == "stale"
       return %w[inconclusive incomplete_evidence] unless complete?(finding, comparison, dimension)
@@ -90,26 +92,67 @@ module Findings
       %w[candidate_clear fresh_comparison_no_issue]
     end
 
-    def target_evidence?(finding, attempt, comparison)
+    def target_evidence?(finding, attempt, comparison, dimension)
       if attempt.deployment
         deployment = attempt.deployment
         return false unless deployment.environment_id == finding.target_environment_id
-        return false unless deployment.deployed_at >= finding.first_seen_at
-        return false unless comparison.compared_at >= deployment.deployed_at
+        return false unless deployment.deployed_at >= finding.first_seen_at &&
+                            comparison.compared_at >= deployment.deployed_at
 
-        true
+        if comparison.mode == "reported"
+          identifier = deployment.artifact.image_digest.presence ||
+            deployment.artifact.identifier
+          return Array(comparison.result.dig("target", "workloads")).any? do |entry|
+            entry.is_a?(Hash) &&
+              entry["event_id"].present? && entry["event_id"] == deployment.external_id &&
+              entry["artifact_identifier"] == identifier &&
+              timestamp_after?(entry["recorded_at"], deployment.deployed_at)
+          end
+        end
+
+        if %w[configuration_names configuration_fingerprints].include?(comparison.mode)
+          snapshot = snapshot_from_dimension(comparison.mode, dimension)
+          return snapshot.present? &&
+            snapshot.environment_id == finding.target_environment_id &&
+            snapshot.collected_at >= deployment.deployed_at &&
+            snapshot.collected_at >= attempt.created_at
+        end
+
+        false
       elsif attempt.vulnerability_scan_run
         scan = attempt.vulnerability_scan_run
         return false unless scan.status == "completed" &&
-                            scan.completed_at.present? &&
-                            scan.completed_at >= finding.first_seen_at &&
-                            comparison.compared_at >= scan.completed_at
+          scan.completed_at.present? &&
+          scan.completed_at >= finding.first_seen_at &&
+          comparison.compared_at >= scan.completed_at
 
         artifact_id = scan.inventory_snapshot.artifact_id
-        finding.target_environment.deployments.where(artifact_id: artifact_id).exists?
+        return false unless finding.target_environment.deployments
+          .where(artifact_id: artifact_id).exists?
+
+        Array(comparison.result.dig("target", "workloads")).any? do |entry|
+          entry.is_a?(Hash) &&
+            entry["inventory_snapshot_id"] == scan.inventory_snapshot_id &&
+            timestamp_after?(entry["scan_completed_at"], scan.completed_at)
+        end
       else
         false
       end
+    end
+
+    def snapshot_from_dimension(mode, dimension)
+      id = if mode == "configuration_names"
+        dimension.dig("target", "snapshot_id")
+      else
+        dimension.dig("target", "snapshot_id")
+      end
+      ConfigurationSnapshot.find_by(id: id) if id
+    end
+
+    def timestamp_after?(value, earliest)
+      value.present? && Time.iso8601(value.to_s) >= earliest
+    rescue ArgumentError
+      false
     end
 
     def relevant_dimension(finding, comparison)
