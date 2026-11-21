@@ -1,0 +1,37 @@
+#!/usr/bin/env ruby
+# frozen_string_literal: true
+
+# A live Kubernetes API probe. It does not sign, publish, or print Pod objects.
+# Runs with the same read-only service account as the production attestor.
+require_relative "../lib/deplograph/kubernetes_control_plane_attestor"
+
+begin
+  expected = JSON.parse(ENV.fetch("DEPLOGRAPH_EXPECTED_WORKLOADS"))
+  client = Deplograph::RuntimeCollectors::ControlPlaneApi.new(
+    host: ENV.fetch("KUBERNETES_SERVICE_HOST"),
+    port: ENV.fetch("KUBERNETES_SERVICE_PORT", "443").to_i,
+    token_file: ENV.fetch("KUBERNETES_TOKEN_FILE",
+      "/var/run/secrets/kubernetes.io/serviceaccount/token"),
+    ca_file: ENV.fetch("KUBERNETES_CA_FILE",
+      "/var/run/secrets/kubernetes.io/serviceaccount/ca.crt")
+  )
+  report = Deplograph::RuntimeCollectors::KubernetesControlPlaneAttestor.new(
+    namespace: ENV.fetch("DEPLOGRAPH_NAMESPACE"),
+    expected_workloads: expected,
+    image_repository: ENV.fetch("DEPLOGRAPH_IMAGE_REPOSITORY"),
+    client: client
+  ).collect
+
+  puts JSON.generate({
+    complete: true,
+    image_repository: report.fetch("image_repository"),
+    observed_replicas: report.fetch("workloads").sum { |entry| entry.fetch("ready_replicas") },
+    workloads: report.fetch("workloads").map { |entry|
+      { name: entry.fetch("name"), ready_replicas: entry.fetch("ready_replicas") }
+    }
+  })
+rescue StandardError => error
+  # Never write Pod metadata, tokens, private keys, or raw response bodies to logs.
+  warn "Kubernetes control-plane probe rejected the observation: #{error.class}"
+  exit 1
+end

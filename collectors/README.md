@@ -113,3 +113,71 @@ application process, results say nothing authoritative about its ENV values.
 It does not attempt to read other processes, Docker secrets, Kubernetes
 Secrets, or remote stores. Any legitimate production collector must be
 explicitly integrated into the application execution context.
+
+## Signed Kubernetes control-plane attestor image (PR #13)
+
+This is a **separate, dependency-free Ruby container** for the signed attestation
+protocol introduced in PR #11. It does not run Rails, bundle gems, require a
+database, mount a Docker socket, or access Kubernetes Secret objects via the API.
+
+Build a local image from the minimal collectors-only context:
+
+```sh
+docker build --pull -f collectors/Dockerfile \
+  -t deplograph-control-plane-attestor:local collectors
+docker run --rm --entrypoint ruby deplograph-control-plane-attestor:local --version
+```
+
+The Dockerfile uses Ruby 4.0.10-slim and only the Ruby standard library.
+Its default base is pinned by a reviewed OCI manifest digest from the image
+verified in CI; for later upgrades, replace it only with an audited
+`RUBY_BASE_IMAGE=...@sha256:...` reference. Publish the resulting image to
+your registry and pin the *published attestor image*
+in `collectors/examples/kubernetes-control-plane-attestor.yaml` with the
+**registry manifest digest**, not a tag or a Docker image config hash.
+A versioned Dockerfile alone does not make builds bit-for-bit reproducible.
+
+The sample manifest grants namespace-scoped `get/list` access to Deployments,
+ReplicaSets and Pods, but not Secrets, ConfigMaps, writes or cluster-wide
+resources. The attestor runs as uid/gid 65534 with dropped capabilities,
+`RuntimeDefault` seccomp, a read-only root filesystem, bounded resources and
+job deadline. The signing private key and scoped Deplograph credential are
+mounted from **separate** administrator-created Secrets as read-only files.
+The ServiceAccount token is needed for the read-only Kubernetes API. No private
+key, observe credential or real cluster configuration is committed to the repo.
+
+The token is read from `DEPLOGRAPH_TOKEN_FILE` when provided. The legacy
+`DEPLOGRAPH_TOKEN` environment variable remains supported for pre-existing
+one-shot integrations, but the CronJob example uses the secret file instead.
+The signing key must be an Ed25519 private key, registered separately by an
+organization owner/admin as its **public** key via `/runtime_attestors`.
+`resolution_enabled` is opt-in, not set by this image or manifest.
+
+### Actual Kubernetes API smoke test in kind
+
+`.github/workflows/attestor-kind-smoke.yml` builds this container, starts a
+throwaway kind cluster and executes `collectors/smoke/kind_attestor_smoke.sh`.
+The script provisions two real Deployments (web with 2 replicas, worker with
+1 replica), scoped RBAC, and ephemeral fake keys/credentials. It exercises
+the **real** Kubernetes HTTPS control-plane API from an attestor Job:
+
+- verifies read-only RBAC and rejection of Secret/pod-write permissions;
+- checks the full pinned workload coverage contract when `imageID` contains
+  a verifiable registry manifest digest;
+- **expects rejection** instead when kind/containerd exposes only an opaque
+  image config/container ID; no fake manifest digest is substituted;
+- scales down web to check that an incomplete rollout is always rejected;
+- runs the Job with the same non-root image and security constraints as
+  the production example, but overrides the entrypoint to a probe that
+  **does not sign or transmit data**.
+
+To run locally, provision a disposable kind cluster, build and load the image
+as shown in the workflow, and run `bash collectors/smoke/kind_attestor_smoke.sh`.
+The namespace contains only synthetic resources, and the smoke CronJob is
+suspended to prevent outbound publishes. This is **not** an end-to-end
+production proof: real network delivery to a Rails installation, public key
+enrollment, production key custody, deployment mapping, GitHub App setup and
+a live `resolved/reopen` transition are not exercised by kind. Signed
+submission and resolution rules are separately covered by Rails integration
+tests and still require a deployment smoke test before enabling production
+automatic resolution.

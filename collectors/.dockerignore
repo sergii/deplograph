@@ -1,0 +1,9 @@
+*
+!bin/
+!bin/kubernetes_control_plane_attest
+!bin/kubernetes_control_plane_probe
+!lib/
+!lib/deplograph/
+!lib/deplograph/kubernetes_control_plane_attestor.rb
+!lib/deplograph/kubernetes_collector.rb
+!lib/deplograph/runtime_collectors.rb
