@@ -1,0 +1,15 @@
+{
+  "repository": "acme/rails-app",
+  "environment": "production",
+  "environment_kind": "production",
+  "deployment_id": "acme-release-1-production",
+  "artifact_identifier": "oci:ghcr.io/acme/rails-app@sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "image": "ghcr.io/acme/rails-app",
+  "image_digest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "commit_sha": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+  "release": "1.0",
+  "occurred_at": "2026-11-20T12:00:00Z",
+  "source": "github_actions",
+  "event_type": "deployment.reported",
+  "event_id": "github-actions-100"
+}

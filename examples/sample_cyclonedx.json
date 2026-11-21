@@ -1,0 +1,53 @@
+{
+  "bomFormat": "CycloneDX",
+  "specVersion": "1.6",
+  "version": 1,
+  "metadata": {
+    "component": {
+      "type": "application",
+      "name": "example-rails-app",
+      "version": "1.0"
+    }
+  },
+  "components": [
+    {
+      "bom-ref": "rails",
+      "type": "library",
+      "name": "rails",
+      "version": "8.1.0",
+      "purl": "pkg:gem/rails@8.1.0"
+    },
+    {
+      "bom-ref": "actionpack",
+      "type": "library",
+      "name": "actionpack",
+      "version": "8.1.0",
+      "purl": "pkg:gem/actionpack@8.1.0"
+    },
+    {
+      "bom-ref": "rack",
+      "type": "library",
+      "name": "rack",
+      "version": "3.1.0",
+      "purl": "pkg:gem/rack@3.1.0"
+    }
+  ],
+  "dependencies": [
+    {
+      "ref": "rails",
+      "dependsOn": [
+        "actionpack"
+      ]
+    },
+    {
+      "ref": "actionpack",
+      "dependsOn": [
+        "rack"
+      ]
+    },
+    {
+      "ref": "rack",
+      "dependsOn": []
+    }
+  ]
+}

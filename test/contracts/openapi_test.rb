@@ -1,0 +1,47 @@
+require "test_helper"
+require "yaml"
+
+class OpenapiTest < ActiveSupport::TestCase
+  EXPECTED = {
+    "/api/v1/inventories" => { "post" => "201" },
+    "/api/v1/releases" => { "get" => "200", "post" => "201" },
+    "/api/v1/deployments" => { "post" => "201" },
+    "/api/v1/integration_events" => { "post" => "202" },
+    "/api/v1/environments" => { "get" => "200" },
+    "/api/v1/environment_events" => { "post" => "201" },
+    "/api/v1/repositories/inspect" => { "post" => "200" },
+    "/api/v1/github/webhooks" => { "post" => "202" }
+  }.freeze
+
+  test "OpenAPI describes implemented routes and response statuses" do
+    spec = YAML.safe_load_file(Rails.root.join("public/openapi.yaml"))
+    assert_equal "3.1.0", spec.fetch("openapi")
+    assert_equal "http", spec.dig("components", "securitySchemes", "IngestionToken", "type")
+    EXPECTED.each do |path, methods|
+      methods.each do |method, status|
+        operation = spec.fetch("paths").fetch(path).fetch(method)
+        assert operation.fetch("responses").key?(status), "#{method.upcase} #{path} lacks #{status}"
+        assert operation.key?("operationId"), "#{method.upcase} #{path} needs operationId"
+        assert Rails.application.routes.recognize_path(path, method: method.to_sym),
+          "Missing Rails route #{method.upcase} #{path}"
+        if path != "/api/v1/github/webhooks"
+          assert spec.fetch("security").any?
+        else
+          assert_equal [], operation.fetch("security")
+        end
+      end
+    end
+  end
+
+  test "OpenAPI JSON response envelopes declare required keys" do
+    spec = YAML.safe_load_file(Rails.root.join("public/openapi.yaml"))
+    %w[/api/v1/inventories /api/v1/releases /api/v1/integration_events /api/v1/environments].each do |path|
+      method = path == "/api/v1/environments" ? "get" : "post"
+      status = { "/api/v1/inventories" => "201", "/api/v1/releases" => "201",
+                 "/api/v1/integration_events" => "202", "/api/v1/environments" => "200" }.fetch(path)
+      required = spec.dig("paths", path, method, "responses", status, "content",
+                          "application/json", "schema", "required")
+      assert required.is_a?(Array) && required.any?, "#{path} must declare required keys"
+    end
+  end
+end

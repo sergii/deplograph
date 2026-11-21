@@ -1,0 +1,16 @@
+{
+  "application": "example-rails-app",
+  "repository": "acme/rails-app",
+  "environment": "production",
+  "environment_kind": "production",
+  "deployment_id": "github-actions-12345-1",
+  "provider": "github_actions",
+  "image": "ghcr.io/acme/rails-app",
+  "image_digest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "commit_sha": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+  "deployed_at": "2026-11-20T12:00:00Z",
+  "metadata": {
+    "workflow": "deploy.yml",
+    "evidence": "reported-by-ci"
+  }
+}
