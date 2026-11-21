@@ -340,3 +340,79 @@ ENV names themselves may contain sensitive architecture information.
 Keep read permissions narrow. Value HMACs, explicit policies like
 \`must_match/must_differ/ignore\`, and actual secret values are **not**
 implemented here.
+
+
+## ENV fingerprints and policies (stacked PR #8)
+
+This opt-in extension to **names-only** configuration drift compares values
+without transmitting or storing them in Deplograph. Instead, an explicitly
+enabled collector computes **HMAC-SHA256** locally and uploads only 64-character
+hexadecimal digests attached to a recently collected names-only snapshot.
+
+The HMAC key is a separate high-entropy secret shared securely across the two
+environments being compared. The key is **not** the Deplograph API bearer token,
+is **never** sent to Deplograph and must have at least 32 random bytes. Store
+it in a restricted-access file, not source control. Give the key a stable
+non-secret ID such as \`rotation-2026-11\`. For a meaningful comparison,
+both sides must use the **same secret and key ID**. Different IDs produce
+\`unknown\`, not a claim of changed values. The backend does not possess
+the key and cannot prove that a client used a correctly configured key.
+
+HMAC message format:
+\`JSON.generate(["deplograph-env-value-v1", repository, variable_name, value])\`.
+This isolates fingerprints by repository and variable name. Do **not** replace
+HMAC with plain SHA-256: low-entropy ENV values would be vulnerable to offline
+dictionary attacks. HMAC still exposes equality to authorized comparisons and
+to an attacker who steals the key. Use least-privilege collector credentials,
+TLS, a secret manager and key rotation.
+
+### Collector
+
+The new opt-in script is \`ruby collectors/bin/env_fingerprints_observe\`.
+It reads values **only in its own process**, calculates HMAC locally and
+sends one names-only snapshot and one HMAC batch to Deplograph. It excludes
+\`DEPLOGRAPH_*\` keys, including collector settings. Required client settings:
+
+- \`DEPLOGRAPH_CONFIG_URL\`: URL ending in \`/api/v1/configuration_snapshots\`
+- \`DEPLOGRAPH_TOKEN\`: provider-matching \`observe\` credential
+- \`DEPLOGRAPH_REPOSITORY\`, \`DEPLOGRAPH_ENVIRONMENT\`, \`DEPLOGRAPH_WORKLOAD\`
+- \`DEPLOGRAPH_COLLECTOR_SOURCE\`: e.g. \`docker_agent\`
+- \`DEPLOGRAPH_HMAC_KEY_FILE\`: local path to raw random key bytes
+- \`DEPLOGRAPH_HMAC_KEY_ID\`: non-secret rotation ID
+
+If the script runs in an unrelated CronJob, the collected variables describe
+the CronJob, **not** the Rails/Kamal process. The resulting snapshots remain
+\`completeness=partial\`. For reliable application-level values, explicit
+instrumentation inside the target process is needed. This collector must not
+be mistaken for that instrumentation.
+
+### API and policies
+
+- \`POST /api/v1/configuration/fingerprints\`: submit one immutable batch for a
+  snapshot collected within the last ten minutes. The server validates names
+  and digest shapes but never sees plaintext values or the shared HMAC key.
+- \`PUT /api/v1/configuration/policies\`: manage a per-repository,
+  baseline/target environment, workload, scope and variable policy. Requires
+  a \`manage\` credential scoped to **both environments**.
+- \`GET /api/v1/configuration/policies\`: list scoped policies with \`read\`.
+- \`POST /api/v1/configuration/fingerprints/drift\`: compare HMAC evidence with
+  \`read\` on both environments and persist the result in DriftComparison
+  history. No raw digests appear in the response.
+
+Rules are \`must_match\` (default for keys without a rule),
+\`must_differ\`, \`allowed_to_differ\`, and \`ignore\`. When a rule is violated,
+the result identifies the variable name and reports \`value_relation=equal\` or
+\`different\`, never the values. Rule changes are stored in
+\`ConfigurationPolicyChange\` with the integration credential that made them.
+
+A \`same\` fingerprint-drift result means **compliant with configured policies**,
+not that every ENV value is identical. Distinct environment key sets and
+unresolved fingerprints remain visible. Incomplete snapshots, unmatched key
+IDs, unobserved variables and stale evidence cannot produce a verified
+clean-state assertion. No runtime verification is claimed.
+
+Fingerprint collection is sensitive even without plaintext. HMAC comparisons
+can reveal whether a value has changed, and ENV names may expose architecture.
+This MVP does not implement user-facing policy editing, KMS-backed key
+distribution, key compromise detection, threshold alerts, or verified
+collector attestation. Those belong to future PRs.
