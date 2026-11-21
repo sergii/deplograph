@@ -23,14 +23,13 @@ module Configuration
       right_hmacs = b.fingerprints_by_name
       left_keys = left.configuration_entries.pluck(:name)
       right_keys = right.configuration_entries.pluck(:name)
-      common = (left_keys & right_keys).sort
-      union = (left_keys | right_keys).sort
       complete = left.completeness == "complete" && right.completeness == "complete" &&
         left_hmacs.size == left_keys.size && right_hmacs.size == right_keys.size
       policies = application.configuration_policies
         .where(baseline_environment: left.environment,
           target_environment: right.environment, workload: workload, scope: scope)
         .index_by(&:name)
+      union = (left_keys | right_keys | policies.keys).sort
 
       violations = []
       unresolved = []
@@ -87,7 +86,12 @@ module Configuration
       end
 
       {
-        status: status, values_compared: true, plaintext_collected: false,
+        status: status, status_semantics: "policy_compliance",
+        policy_compliant: violations.empty? && unresolved.empty? && complete && status != "stale",
+        known_value_differences: comparisons.select { |item|
+          item["value_relation"] == "different"
+        }.map { |item| item["name"] },
+        values_compared: true, plaintext_collected: false,
         algorithm: a.algorithm, key_id: a.key_id,
         baseline: { snapshot_id: left.id, fingerprint_batch_id: a.id },
         target: { snapshot_id: right.id, fingerprint_batch_id: b.id },
@@ -104,7 +108,8 @@ module Configuration
 
     def unknown_result(reason, names)
       {
-        status: "unknown", reason: reason,
+        status: "unknown", reason: reason, status_semantics: "policy_compliance",
+        policy_compliant: false, known_value_differences: [],
         values_compared: false, plaintext_collected: false,
         baseline: names[:baseline], target: names[:target],
         key_names: names.slice(:baseline_count, :target_count, :common_count,
