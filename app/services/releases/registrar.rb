@@ -2,7 +2,7 @@ module Releases
   class Registrar
     class Conflict < StandardError; end
 
-    def call(body)
+    def call(body, organization:)
       repository = body.fetch("repository")
       raise ArgumentError, "Invalid repository" unless repository.match?(/\A[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+\z/)
 
@@ -16,7 +16,7 @@ module Releases
       raise ArgumentError, "At least one artifact required" unless entries.is_a?(Array) && entries.any? && entries.length <= 100
 
       ApplicationRecord.transaction do
-        app = Application.find_or_create_by!(repository_full_name: repository) do |record|
+        app = organization.applications.find_or_create_by!(repository_full_name: repository) do |record|
           record.name = repository.split("/").last
         end
         revision = app.source_revisions.find_or_create_by!(commit_sha: sha)
