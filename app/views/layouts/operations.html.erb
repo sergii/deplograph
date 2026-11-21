@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <%= csrf_meta_tags %>
+  <title>Deplograph | Drift intelligence</title>
+  <style>
+    :root { color-scheme:light; font: 15px/1.5 ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif; color:#17253b; background:#f5f7fb; }
+    * { box-sizing:border-box }
+    body { margin:0; min-width:320px }
+    a { color:#2563eb; text-decoration:none }
+    a:hover { text-decoration:underline }
+    button,input,select,textarea { font:inherit }
+    button { cursor:pointer }
+    .shell { display:flex; min-height:100vh }
+    .sidebar { width:228px; flex:none; background:#14243c; color:#d3deef; padding:26px 16px; }
+    .brand { display:flex; align-items:center; gap:10px; color:white; font-weight:800; font-size:21px; letter-spacing:-.6px; padding:0 12px 30px }
+    .brand-mark { display:grid; place-items:center; border-radius:11px; background:#3b82f6; height:34px; width:34px; font-size:17px }
+    .nav-item { display:block; color:#c9d5e7; padding:10px 12px; margin:4px 0; border-radius:9px; font-weight:550 }
+    .nav-item:hover, .nav-item[aria-current=page] { color:#fff; background:#263e60; text-decoration:none }
+    .sidebar-bottom { margin-top:28px; padding:16px 12px; border-top:1px solid #354a65; font-size:13px; color:#acbdd5 }
+    .sidebar-bottom strong { display:block; color:white; overflow-wrap:anywhere }
+    .sidebar button { background:transparent; color:#cbd5e1; border:0; padding:10px 0 }
+    main { min-width:0; flex:1; padding:34px clamp(18px,3vw,48px); max-width:1550px }
+    h1 { margin:0 0 8px; font-size:clamp(25px,2.4vw,34px); letter-spacing:-.8px; font-weight:750 }
+    h2 { font-size:19px; margin:0 0 16px; letter-spacing:-.3px }
+    h3 { font-size:16px; margin:0 0 10px }
+    p { margin:4px 0 14px }
+    .muted { color:#6a788e }
+    .small { font-size:12px }
+    .eyebrow { text-transform:uppercase; font-size:11px; letter-spacing:1.1px; font-weight:750; color:#63748c; margin-bottom:8px }
+    .topline { display:flex; align-items:center; flex-wrap:wrap; justify-content:space-between; gap:12px; margin-bottom:24px }
+    .panel { background:#fff; border:1px solid #e0e7f0; border-radius:14px; padding:21px; box-shadow:0 1px 2px #18263e05 }
+    .stack { display:grid; gap:18px }
+    .metrics { display:grid; grid-template-columns:repeat(auto-fit,minmax(172px,1fr)); gap:14px; margin-bottom:22px }
+    .metric-number { font-size:30px; font-weight:800; letter-spacing:-1.2px; margin:3px 0 }
+    .grid-two { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:18px }
+    .flex { display:flex; align-items:center; gap:12px; flex-wrap:wrap }
+    .spacer { flex:1 }
+    .btn { display:inline-flex; align-items:center; justify-content:center; border:1px solid #cbd5e1; color:#27364b; background:#fff; padding:8px 13px; border-radius:9px; font-weight:650; font-size:13px; min-height:38px }
+    .btn-primary { background:#2563eb; border-color:#2563eb; color:white }
+    .btn-primary:hover { background:#1d4ed8; color:white; text-decoration:none }
+    .btn:hover { border-color:#2563eb; text-decoration:none }
+    label { font-weight:600; font-size:13px; display:block; margin-bottom:5px }
+    input,select,textarea { width:100%; border:1px solid #ccd6e3; border-radius:8px; min-height:38px; padding:8px 10px; background:#fff; color:#17253b }
+    textarea { resize:vertical; min-height:78px }
+    input:focus,select:focus,textarea:focus { outline:2px solid #93c5fd; outline-offset:1px }
+    .filters { display:flex; align-items:end; flex-wrap:wrap; gap:12px }
+    .filters > div { flex:1 1 140px }
+    .table-wrap { overflow-x:auto }
+    table { border-collapse:collapse; width:100%; text-align:left }
+    th { color:#64748b; font-size:11px; font-weight:750; letter-spacing:.4px; text-transform:uppercase }
+    td,th { padding:12px 11px; border-bottom:1px solid #e7edf5; vertical-align:middle }
+    tr:last-child td { border-bottom:0 }
+    td { font-size:13px }
+    td code,pre { font-family:ui-monospace,SFMono-Regular,Consolas,monospace }
+    code { overflow-wrap:anywhere }
+    pre { font-size:12px; white-space:pre-wrap; overflow-wrap:anywhere; background:#f6f8fc; border:1px solid #e6ecf4; border-radius:9px; padding:14px }
+    .pill { display:inline-block; border-radius:100px; padding:4px 9px; background:#e8eef7; color:#42536f; font-size:11px; font-weight:750; white-space:nowrap }
+    .pill-open,.pill-different,.pill-p1,.pill-critical,.pill-high { background:#fee2e2; color:#991b1b }
+    .pill-investigating,.pill-stale,.pill-medium,.pill-p2,.pill-verification_pending { background:#fef3c7; color:#92400e }
+    .pill-resolved,.pill-same,.pill-low { background:#dcfce7; color:#166534 }
+    .pill-acknowledged,.pill-partial,.pill-unknown,.pill-p3 { background:#dbeafe; color:#1e40af }
+    .pill-dismissed { background:#f1f5f9; color:#64748b }
+    .empty { text-align:center; padding:30px; color:#687991; border:1px dashed #c9d5e5; border-radius:12px }
+    .flash { border-radius:9px; padding:11px 14px; margin-bottom:18px; background:#dbeafe; color:#1e40af }
+    .timeline { border-left:2px solid #e4eaf3; padding-left:22px; display:grid; gap:17px }
+    .event { position:relative; }
+    .event:before { content:""; position:absolute; left:-29px; top:4px; width:10px; height:10px; border-radius:50%; background:#3b82f6; border:3px solid #fff; box-shadow:0 0 0 1px #dbeafe }
+    .nav-back { display:inline-block; margin-bottom:13px; font-size:13px }
+    @media(max-width:850px) { .sidebar{width:174px;padding:18px 8px}.brand{font-size:17px}.grid-two{grid-template-columns:1fr}main{padding:24px 16px} }
+    @media(max-width:600px) { .shell{display:block}.sidebar{width:100%;padding:10px 14px}.brand{padding:2px 8px 10px}.sidebar nav{display:flex;gap:3px;flex-wrap:wrap}.nav-item{padding:6px 9px}.sidebar-bottom{display:none}main{padding:20px 13px} }
+    @media(prefers-reduced-motion:reduce) { *,*:before,*:after{scroll-behavior:auto !important} }
+  </style>
+</head>
+<body>
+<div class="shell">
+  <aside class="sidebar">
+    <%= link_to root_path, class: "brand" do %>
+      <span class="brand-mark">D</span><span>Deplograph</span>
+    <% end %>
+    <nav aria-label="Primary navigation">
+      <%= link_to "Overview", root_path, class: "nav-item" %>
+      <%= link_to "Drift comparisons", drift_dashboard_path, class: "nav-item", "aria-current": (controller_name == "drift_dashboard" ? "page" : nil) %>
+      <%= link_to "Findings", findings_path, class: "nav-item", "aria-current": (controller_name == "findings" ? "page" : nil) %>
+      <%= link_to "GitHub integrations", github_installations_path, class: "nav-item" %>
+    </nav>
+    <div class="sidebar-bottom">
+      <span>Organization</span>
+      <strong><%= current_organization.name %></strong>
+      <span><%= current_user.email %></span>
+      <%= button_to "Sign out", logout_path, method: :delete %>
+    </div>
+  </aside>
+  <main id="main-content">
+    <% if flash[:notice].present? %><div class="flash" role="status"><%= flash[:notice] %></div><% end %>
+    <% if flash[:alert].present? %><div class="flash" role="alert"><%= flash[:alert] %></div><% end %>
+    <%= yield %>
+  </main>
+</div>
+</body>
+</html>
