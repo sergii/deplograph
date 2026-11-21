@@ -3,6 +3,7 @@ class Environment < ApplicationRecord
   has_many :deployments, dependent: :destroy
   has_many :deployment_events, dependent: :destroy
   has_many :deployment_observations, dependent: :destroy
+  has_many :runtime_attestors, dependent: :destroy
   has_many :configuration_snapshots, dependent: :destroy
 
   validates :name, presence: true
