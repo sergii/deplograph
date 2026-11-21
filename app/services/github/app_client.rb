@@ -8,7 +8,7 @@ module Github
 
     def self.configured?
       %w[GITHUB_APP_ID GITHUB_APP_CLIENT_ID GITHUB_APP_CLIENT_SECRET
-         GITHUB_APP_PRIVATE_KEY].all? { |name| ENV[name].present? }
+         GITHUB_APP_PRIVATE_KEY GITHUB_APP_CALLBACK_URL].all? { |name| ENV[name].present? }
     end
 
     def initialize(app_id: ENV["GITHUB_APP_ID"], private_key: ENV["GITHUB_APP_PRIVATE_KEY"])
