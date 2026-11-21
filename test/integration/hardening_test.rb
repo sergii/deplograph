@@ -2,26 +2,23 @@ require "test_helper"
 
 class HardeningTest < ActionDispatch::IntegrationTest
   setup do
-    @previous = %w[
-      DEPLOGRAPH_INGEST_TOKEN
-      DEPLOGRAPH_KUBERNETES_OBSERVER_TOKEN
-      DEPLOGRAPH_KAMAL_AGENT_OBSERVER_TOKEN
-    ].to_h { |key| [key, ENV[key]] }
-    ENV["DEPLOGRAPH_INGEST_TOKEN"] = "test-general-ingestion"
-    ENV["DEPLOGRAPH_KUBERNETES_OBSERVER_TOKEN"] = "test-k8s-observer"
-    ENV["DEPLOGRAPH_KAMAL_AGENT_OBSERVER_TOKEN"] = "test-kamal-observer"
-  end
-
-  teardown do
-    @previous.each { |key, value| ENV[key] = value }
+    @organization = create_test_organization
+    @api_token = issue_test_token(organization: @organization)
+    @github_token = issue_test_token(
+      organization: @organization, provider: "github_actions", permissions: %w[report]
+    )
+    @kubernetes_credential, @kubernetes_token = IntegrationCredential.issue!(
+      organization: @organization, name: "Kubernetes observer", provider: "kubernetes",
+      permissions: %w[observe]
+    )
   end
 
   test "a generic ingestion token never authorizes runtime observations" do
     post "/api/v1/integration_events",
       params: JSON.generate(observation("kubernetes")),
-      headers: auth("test-general-ingestion")
+      headers: auth(@api_token)
 
-    assert_response :unauthorized
+    assert_response :forbidden
     assert_equal 0, DeploymentObservation.count
     assert_equal 0, DeploymentEvent.count
   end
@@ -29,24 +26,24 @@ class HardeningTest < ActionDispatch::IntegrationTest
   test "observer tokens are bound to their provider identity" do
     post "/api/v1/integration_events",
       params: JSON.generate(observation("kamal_agent")),
-      headers: auth("test-k8s-observer")
-    assert_response :unauthorized
+      headers: auth(@kubernetes_token)
+    assert_response :forbidden
 
     post "/api/v1/integration_events",
       params: JSON.generate(observation("kubernetes")),
-      headers: auth("test-k8s-observer")
+      headers: auth(@kubernetes_token)
     assert_response :accepted
     assert_equal 1, DeploymentObservation.count
     assert_equal "kubernetes", DeploymentObservation.last.source
   end
 
-  test "an unconfigured observer cannot make observations" do
-    ENV.delete("DEPLOGRAPH_KUBERNETES_OBSERVER_TOKEN")
+  test "a revoked observer cannot make observations" do
+    @kubernetes_credential.revoke!
     post "/api/v1/integration_events",
       params: JSON.generate(observation("kubernetes")),
-      headers: auth("test-k8s-observer")
+      headers: auth(@kubernetes_token)
 
-    assert_response :service_unavailable
+    assert_response :unauthorized
     assert_equal 0, DeploymentObservation.count
   end
 
@@ -57,7 +54,7 @@ class HardeningTest < ActionDispatch::IntegrationTest
     payload["deployed_at"] = Time.current.utc.iso8601
 
     2.times do
-      post "/api/v1/deployments", params: JSON.generate(payload), headers: auth("test-general-ingestion")
+      post "/api/v1/deployments", params: JSON.generate(payload), headers: auth(@github_token)
       assert_response :created
     end
     assert_equal 1, Deployment.count
@@ -68,11 +65,11 @@ class HardeningTest < ActionDispatch::IntegrationTest
       environment: payload.fetch("environment"),
       kind: "preview", event: "destroyed"
     }
-    post "/api/v1/environment_events", params: JSON.generate(lifecycle), headers: auth("test-general-ingestion")
+    post "/api/v1/environment_events", params: JSON.generate(lifecycle), headers: auth(@api_token)
     assert_response :created
     assert_equal "destroyed", Environment.last.reload.state
 
-    post "/api/v1/deployments", params: JSON.generate(payload), headers: auth("test-general-ingestion")
+    post "/api/v1/deployments", params: JSON.generate(payload), headers: auth(@github_token)
     assert_response :conflict
     assert_equal "destroyed", Environment.last.reload.state
     assert_equal 1, Deployment.count
@@ -84,17 +81,17 @@ class HardeningTest < ActionDispatch::IntegrationTest
     identifier = "oci:ghcr.io/acme/app@#{digest}"
     initial = inventory(identifier: identifier, digest: digest, commit: "a" * 40)
 
-    post "/api/v1/inventories", params: JSON.generate(initial), headers: auth("test-general-ingestion")
+    post "/api/v1/inventories", params: JSON.generate(initial), headers: auth(@api_token)
     assert_response :created
     artifact = Artifact.last
 
     altered_commit = inventory(identifier: identifier, digest: digest, commit: "b" * 40)
-    post "/api/v1/inventories", params: JSON.generate(altered_commit), headers: auth("test-general-ingestion")
+    post "/api/v1/inventories", params: JSON.generate(altered_commit), headers: auth(@api_token)
     assert_response :conflict
     assert_equal "a" * 40, artifact.reload.commit_sha
 
     altered_digest = inventory(identifier: identifier, digest: "sha256:" + "c" * 64, commit: "a" * 40)
-    post "/api/v1/inventories", params: JSON.generate(altered_digest), headers: auth("test-general-ingestion")
+    post "/api/v1/inventories", params: JSON.generate(altered_digest), headers: auth(@api_token)
     assert_response :conflict
     assert_equal digest, artifact.reload.image_digest
     assert_equal 1, InventorySnapshot.count
@@ -112,7 +109,7 @@ class HardeningTest < ActionDispatch::IntegrationTest
       image: "ghcr.io/acme/app", image_digest: digest,
       artifact_identifier: identifier, deployed_at: Time.current.utc.iso8601
     }
-    post "/api/v1/deployments", params: JSON.generate(reported), headers: auth("test-general-ingestion")
+    post "/api/v1/deployments", params: JSON.generate(reported), headers: auth(@github_token)
     assert_response :created
 
     observed = observation("kubernetes").merge(
@@ -120,11 +117,11 @@ class HardeningTest < ActionDispatch::IntegrationTest
       "deployment_id" => "deploy-123", "image" => "ghcr.io/acme/app",
       "artifact_identifier" => identifier, "image_digest" => digest
     )
-    post "/api/v1/integration_events", params: JSON.generate(observed), headers: auth("test-k8s-observer")
+    post "/api/v1/integration_events", params: JSON.generate(observed), headers: auth(@kubernetes_token)
     assert_response :accepted
 
     assert_equal "reported", Deployment.last.reload.status
-    get "/api/v1/environments", params: { repository: "acme/app" }, headers: auth("test-general-ingestion")
+    get "/api/v1/environments", params: { repository: "acme/app" }, headers: auth(@api_token)
     assert_response :success
     environment = response.parsed_body.fetch("environments").first
     assert_equal "partial", environment.fetch("verification_status")
