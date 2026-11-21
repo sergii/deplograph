@@ -3,6 +3,7 @@ module Api
     class RepositoriesController < BaseController
       def inspect
         body = payload
+        return unless authorize_integration!(permission: "read", repository: body["repository"])
         app = application_for(body)
         details = Github::RepositoryInspector.new.call(app.repository_full_name)
         app.update!(repository_metadata: details, inspected_at: Time.current)
