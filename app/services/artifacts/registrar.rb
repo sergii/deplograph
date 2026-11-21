@@ -1,6 +1,4 @@
 module Artifacts
-  class IdentityConflict < StandardError; end
-
   class Registrar
     DIGEST = /\Asha256:[a-f0-9]{64}\z/
     COMMIT_SHA = /\A[a-f0-9]{40}\z/
