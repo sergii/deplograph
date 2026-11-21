@@ -1,3 +1,5 @@
+require "set"
+
 module Configuration
   class KeyDiffer
     MAX_PROCESS_AGE = 1.hour
