@@ -107,4 +107,10 @@ PostgreSQL 19.0 was released on November 19, 2026. As of this change, the offici
 
 ## API and integration security
 
-This is still a single-tenant prototype. The shared bearer token authenticates ingestion but is not scoped to repositories or providers. The event source field is descriptive and is not independent proof of a provider's identity. Kubernetes observations in the simulation are synthetic. Before public exposure use per-tenant identities, signed/OIDC delivery or agent keys, replay prevention, request limits, permissions enforcement, and a real runtime collector.
+This is still a single-tenant prototype. The global bearer token authenticates source inventory and deployment reports but **cannot** submit `artifact.observed` events. Those events require a distinct token for their declared collector source: `DEPLOGRAPH_KUBERNETES_OBSERVER_TOKEN`, `DEPLOGRAPH_KAMAL_AGENT_OBSERVER_TOKEN`, `DEPLOGRAPH_DOCKER_AGENT_OBSERVER_TOKEN`, or `DEPLOGRAPH_AWS_ECS_OBSERVER_TOKEN`. Missing observer configuration fails closed. A token identifies a source type but **does not yet scope a collector to one tenant, cluster, or repository**. Never expose observer tokens to CI/reporting clients. The legacy deployment endpoint uses the same evidence pipeline and remains reporting-only.
+
+A matching container digest is only **partial evidence**, never full rollout verification. `verification_status` distinguishes `unverified`, `partial`, `stale`, `observations_only`, `unknown`, and `conflicting_observation`. This is not a claim of full coverage. Matching findings and SBOMs must be independently collected; simulations are synthetic.
+
+Artifacts are identified immutably: a previously recorded digest or commit SHA cannot be replaced by subsequent reports. OSV rescans replace only OSV matches, preserving evidence from other advisory sources.
+
+Before public exposure, implement per-tenant identities, scoped collector permissions, signed/OIDC delivery or agent keys, replay protection, rate limiting, audit logs, and real runtime collectors.
