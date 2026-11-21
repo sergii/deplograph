@@ -208,15 +208,15 @@ class TrustedRuntimeAttestationsTest < ActionDispatch::IntegrationTest
     travel 3.seconds do
       submit_attestation
       assert_equal "resolved", @finding.reload.status
-      travel 5.seconds do
-        regression = comparison("different", compared_at: Time.current,
-          target_digest: OLD_DIGEST)
-        assert_equal "open", @finding.reload.status
-        assert_nil @finding.resolved_at
-        assert_equal regression.id, @finding.latest_comparison_id
-        assert_equal 1, FindingResolution.where(drift_finding: @finding).count
-        assert_equal 1, @finding.drift_finding_events.where(action: "reopened").count
-      end
+    end
+    travel 8.seconds do
+      regression = comparison("different", compared_at: Time.current,
+        target_digest: OLD_DIGEST)
+      assert_equal "open", @finding.reload.status
+      assert_nil @finding.resolved_at
+      assert_equal regression.id, @finding.latest_comparison_id
+      assert_equal 1, FindingResolution.where(drift_finding: @finding).count
+      assert_equal 1, @finding.drift_finding_events.where(action: "reopened").count
     end
   end
 
