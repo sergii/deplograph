@@ -1,5 +1,6 @@
 class ConfigurationSnapshot < ApplicationRecord
   belongs_to :environment
+  has_many :configuration_fingerprint_batches, dependent: :destroy
   has_many :configuration_entries, dependent: :destroy
 
   SCOPES = %w[declared process].freeze
