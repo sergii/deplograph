@@ -1,6 +1,7 @@
 class Organization < ApplicationRecord
   has_many :memberships, dependent: :destroy
   has_many :users, through: :memberships
+  has_many :drift_findings, dependent: :destroy
   has_many :applications, dependent: :destroy
   has_many :drift_comparisons, dependent: :destroy
   has_many :integration_credentials, dependent: :destroy
