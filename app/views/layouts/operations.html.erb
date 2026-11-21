@@ -84,6 +84,7 @@
       <%= link_to "Overview", root_path, class: "nav-item" %>
       <%= link_to "Drift comparisons", drift_dashboard_path, class: "nav-item", "aria-current": (controller_name == "drift_dashboard" ? "page" : nil) %>
       <%= link_to "Findings", findings_path, class: "nav-item", "aria-current": (controller_name == "findings" ? "page" : nil) %>
+      <%= link_to "Runtime attestors", runtime_attestors_path, class: "nav-item", "aria-current": (controller_name == "runtime_attestors" ? "page" : nil) %>
       <%= link_to "GitHub integrations", github_installations_path, class: "nav-item" %>
     </nav>
     <div class="sidebar-bottom">
