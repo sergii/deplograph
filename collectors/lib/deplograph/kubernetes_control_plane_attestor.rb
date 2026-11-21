@@ -198,7 +198,12 @@ module Deplograph
         @token, @attestor_id, @repository, @environment = token, Integer(attestor_id), repository, environment
         raise Error, "Missing credential" if @token.to_s.empty?
         @key = OpenSSL::PKey.read(File.binread(private_key_file))
-        raise Error, "Ed25519 private key required" unless @key.oid == "ED25519" && @key.private?
+        raise Error, "Ed25519 private key required" unless @key.oid == "ED25519"
+        begin
+          @key.sign(nil, "deplograph-private-key-check-v1")
+        rescue OpenSSL::PKey::PKeyError
+          raise Error, "Ed25519 private key required"
+        end
       end
 
       def publish(collected)
