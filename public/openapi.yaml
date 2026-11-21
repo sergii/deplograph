@@ -143,11 +143,8 @@ paths:
   /api/v1/configuration_snapshots:
     post:
       operationId: importEnvNames
-      summary: Ingest names-only environment configuration snapshot
-      description: |
-        Accepts only an array of ENV key names, never key/value pairs.
-        Requires observe permission for process scope, report for declared scope,
-        and a credential matching the claimed provider and repository/environment.
+      summary: Store an ENV names-only configuration snapshot
+      description: Only key names are accepted. Values and unknown request properties are rejected.
       requestBody:
         required: true
         content:
@@ -169,282 +166,12 @@ paths:
                   type: array
                   uniqueItems: true
                   maxItems: 5000
-                  items: { type: string, pattern: '^[A-Za-z_][A-Za-z0-9_]{0,127}
-    post:
-      operationId: registerRelease
-      summary: Register source revision, logical release and artifacts
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/ReleaseRequest'
+                  items:
+                    type: string
+                    pattern: "^[A-Za-z_][A-Za-z0-9_]{0,127}$"
       responses:
         '201':
-          description: Release registered
-          content:
-            application/json:
-              schema:
-                type: object
-                required: [id, repository, release, commit_sha, artifacts]
-                properties:
-                  id: { type: integer }
-                  repository: { type: string }
-                  release: { type: string }
-                  commit_sha: { type: string }
-                  artifacts: { type: array, items: { type: string } }
-        '401': { description: Unauthorized }
-        '409': { description: Conflicting release identity }
-        '422': { description: Invalid release }
-    get:
-      operationId: listReleases
-      parameters:
-        - name: repository
-          in: query
-          required: true
-          schema: { type: string }
-      responses:
-        '200':
-          description: Release list
-          content:
-            application/json:
-              schema:
-                type: object
-                required: [releases]
-                properties:
-                  releases: { type: array, items: { type: object } }
-        '401': { description: Unauthorized }
-        '404': { description: Repository not found }
-  /api/v1/deployments:
-    post:
-      operationId: reportLegacyDeployment
-      summary: Report a deployment (legacy ingestion contract)
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema: { type: object }
-      responses:
-        '201': { description: Report recorded, runtime not verified }
-        '401': { description: Unauthorized }
-        '422': { description: Invalid report }
-  /api/v1/integration_events:
-    post:
-      operationId: ingestIntegrationEvent
-      summary: Correlate deployment reports and independent runtime observations
-      description: |
-        Every request requires an active organization credential. Required permissions
-        are read, report or observe; event source must match credential provider.
-        Repository and environment scopes are enforced before data is accessed.
-        Observations are partial evidence, not proof of completed rollout.
-      security:
-        - IntegrationCredential: []
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/IntegrationEvent'
-      responses:
-        '202':
-          description: Event accepted, idempotent by source and event ID
-          content:
-            application/json:
-              schema:
-                type: object
-                required: [event_id, source, event_type, environment_id]
-                properties:
-                  event_id: { type: string }
-                  source: { type: string }
-                  event_type: { type: string }
-                  environment_id: { type: integer }
-                  deployment_id: { type: [integer, 'null'] }
-        '401': { description: Unauthorized }
-        '409': { description: Event or artifact identity conflict }
-        '422': { description: Invalid event }
-        '403': { description: Credential lacks scope or permission }
-  /api/v1/environments:
-    get:
-      operationId: listEnvironmentExposure
-      parameters:
-        - name: repository
-          in: query
-          required: true
-          schema: { type: string }
-      responses:
-        '200':
-          description: Per-environment reported and observed inventories
-          content:
-            application/json:
-              schema:
-                type: object
-                required: [repository, environments]
-                properties:
-                  repository: { type: string }
-                  environments:
-                    type: array
-                    items: { $ref: '#/components/schemas/EnvironmentSummary' }
-        '401': { description: Unauthorized }
-        '404': { description: Repository not found }
-  /api/v1/environment_events:
-    post:
-      operationId: environmentLifecycleEvent
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema: { type: object }
-      responses:
-        '201': { description: Environment updated }
-        '401': { description: Unauthorized }
-        '422': { description: Invalid event }
-  /api/v1/repositories/inspect:
-    post:
-      operationId: inspectRepository
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              type: object
-              required: [repository]
-              properties:
-                repository: { type: string }
-      responses:
-        '200': { description: GitHub repository inspection }
-        '401': { description: Unauthorized }
-        '422': { description: Invalid request }
-        '502': { description: GitHub API failure }
-  /api/v1/github/webhooks:
-    post:
-      operationId: receiveGithubWebhook
-      security: []
-      summary: Validate GitHub HMAC and update installation permissions
-      parameters:
-        - name: X-Hub-Signature-256
-          in: header
-          required: true
-          schema: { type: string }
-        - name: X-GitHub-Event
-          in: header
-          required: true
-          schema: { type: string }
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema: { type: object }
-      responses:
-        '202': { description: Webhook accepted }
-        '401': { description: Invalid signature }
-        '422': { description: Invalid payload }
-        '503': { description: Webhook secret not configured }
-components:
-  securitySchemes:
-    IntegrationCredential:
-      type: http
-      scheme: bearer
-      description: Hashed, organization-scoped credential with read/report/observe and optional repository/environment restrictions
-  schemas:
-    DriftComparisonResponse:
-      type: object
-      required: [id, repository, baseline_environment, target_environment, compared_at, status, result]
-      properties:
-        id: { type: integer }
-        repository: { type: string }
-        baseline_environment: { type: string }
-        target_environment: { type: string }
-        compared_at: { type: string, format: date-time }
-        status: { type: string, enum: [same, different, partial, unknown, stale] }
-        result:
-          type: object
-          required: [status, mode, verified_runtime, confidence, known_differences, incomplete_dimensions, baseline, target, dimensions]
-          properties:
-            status: { type: string }
-            mode: { type: string, enum: [reported, observed, configuration_names] }
-            verified_runtime: { type: boolean, const: false }
-            confidence: { type: string, enum: [partial, reported_only] }
-            known_differences: { type: array, items: { type: string } }
-            incomplete_dimensions: { type: array, items: { type: string } }
-            baseline: { type: object }
-            target: { type: object }
-            dimensions: { type: object }
-    InventoryRequest:
-      type: object
-      required: [repository, artifact_identifier, format, sbom]
-      properties:
-        repository: { type: string }
-        artifact_identifier: { type: string }
-        artifact_kind: { type: string, enum: [source, image, binary] }
-        format: { type: string, enum: [cyclonedx, spdx] }
-        sbom: { type: object }
-    ReleaseRequest:
-      type: object
-      required: [repository, release, commit_sha, artifacts]
-      properties:
-        repository: { type: string }
-        release: { type: string }
-        commit_sha: { type: string, pattern: '^[a-f0-9]{40}$' }
-        build: { type: object }
-        artifacts:
-          type: array
-          minItems: 1
-          items:
-            type: object
-            required: [identifier, image_digest]
-            properties:
-              identifier: { type: string }
-              image_digest: { type: string, pattern: '^sha256:[a-f0-9]{64}$' }
-    IntegrationEvent:
-      type: object
-      required: [repository, environment, source, event_type, event_id, occurred_at]
-      properties:
-        repository: { type: string }
-        environment: { type: string }
-        environment_kind: { type: string }
-        source: { type: string, enum: [ci, github_actions, kamal, kubernetes, kamal_agent, docker_agent, aws_ecs] }
-        event_type: { type: string, enum: [deployment.reported, artifact.observed] }
-        event_id: { type: string }
-        occurred_at: { type: string, format: date-time }
-        deployment_id: { type: string }
-        image: { type: string }
-        image_digest: { type: string, pattern: '^sha256:[a-f0-9]{64}$' }
-        artifact_identifier: { type: string }
-        workload: { type: string }
-        release: { type: string }
-    EnvironmentSummary:
-      type: object
-      required: [name, kind, state, verification_status, reported, observed]
-      properties:
-        name: { type: string }
-        kind: { type: string }
-        state: { type: string }
-        verification_status:
-          type: string
-          enum: [unverified, partial, stale, observations_only, unknown, conflicting_observation]
-        expires_at: { type: [string, 'null'], format: date-time }
-        reported:
-          type: [object, 'null']
-          properties:
-            reporting_sources: { type: array, items: { type: string } }
-        observed:
-          type: array
-          items:
-            type: object
-            required: [workload, source, event_id, image_digest, observed_at, fresh, inventory_status, vulnerability_ids]
-            properties:
-              workload: { type: string }
-              source: { type: string }
-              event_id: { type: string }
-              image_digest: { type: string }
-              observed_at: { type: string, format: date-time }
-              fresh: { type: boolean }
-              inventory_status: { type: string }
-              vulnerability_ids: { type: array, items: { type: string } }
- }
-      responses:
-        '201':
-          description: Names-only snapshot stored
+          description: Snapshot stored
           content:
             application/json:
               schema:
@@ -459,9 +186,9 @@ components:
                   collected_at: { type: string, format: date-time }
                   key_count: { type: integer }
                   keys_sha256: { type: string }
-        '401': { description: Missing or revoked credential }
-        '403': { description: Credential does not have source or environment permission }
-        '409': { description: Collection ID reused with different evidence }
+        '401': { description: Invalid credential }
+        '403': { description: Missing provider or environment permission }
+        '409': { description: Conflicting collection ID }
         '422': { description: Invalid or value-bearing payload }
     get:
       operationId: listEnvNameSnapshots
@@ -482,25 +209,24 @@ components:
           schema: { type: string, enum: [declared, process] }
       responses:
         '200':
-          description: Scoped list of configuration snapshots and names
+          description: Scoped names-only snapshots
           content:
             application/json:
               schema:
                 type: object
                 required: [snapshots]
                 properties:
-                  snapshots: { type: array, items: { type: object } }
-        '401': { description: Missing or revoked credential }
-        '403': { description: Environment read permission denied }
-        '404': { description: Application or environment not found }
+                  snapshots:
+                    type: array
+                    items: { type: object }
+        '401': { description: Invalid credential }
+        '403': { description: Environment scope denied }
+        '404': { description: Environment not found }
   /api/v1/configuration/drift:
     post:
       operationId: compareEnvNames
-      summary: Compare ENV key names between two environments
-      description: |
-        Compares matching sources, workloads and declared/process scopes.
-        Partial and stale observations never prove a key is absent.
-        Results are saved in existing DriftComparison history.
+      summary: Compare ENV key name sets between environments
+      description: Matching workload, scope and source are required. Partial evidence never proves absence.
       requestBody:
         required: true
         content:
@@ -516,7 +242,7 @@ components:
                 workload: { type: string }
       responses:
         '201':
-          description: Names-only comparison
+          description: Persisted configuration drift result
           content:
             application/json:
               schema:
@@ -526,9 +252,9 @@ components:
                   id: { type: integer }
                   status: { type: string, enum: [same, different, partial, unknown, stale] }
                   result: { type: object }
-        '401': { description: Missing or revoked credential }
-        '403': { description: Baseline or target environment scope denied }
-        '404': { description: Application or environment not found }
+        '401': { description: Invalid credential }
+        '403': { description: Environment scope denied }
+        '404': { description: Environment not found }
         '422': { description: Invalid comparison }
   /api/v1/releases:
     post:
