@@ -71,6 +71,75 @@ paths:
         '401': { description: Unauthorized }
         '403': { description: Credential scope or permission denied }
         '422': { description: Invalid or oversized lockfile }
+  /api/v1/drift/comparisons:
+    post:
+      operationId: compareEnvironments
+      summary: Create an evidence-qualified environment drift comparison
+      description: |
+        Defaults to reported deployment evidence. The observed mode uses incomplete
+        runtime observations and never asserts full rollout verification.
+        Missing inventories, incomplete coverage and stale advisory scans are explicit.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [repository, baseline_environment, target_environment]
+              properties:
+                repository: { type: string }
+                baseline_environment: { type: string }
+                target_environment: { type: string }
+                mode: { type: string, enum: [reported, observed], default: reported }
+      responses:
+        '201':
+          description: Immutable comparison result, including evidence snapshot IDs
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/DriftComparisonResponse' }
+        '401': { description: Missing or revoked credential }
+        '403': { description: Repository or environment scope denied }
+        '404': { description: Application or environment not found }
+        '422': { description: Invalid comparison }
+    get:
+      operationId: listDriftComparisons
+      parameters:
+        - name: repository
+          in: query
+          required: true
+          schema: { type: string }
+      responses:
+        '200':
+          description: Comparison history for authorized environments
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [comparisons]
+                properties:
+                  comparisons:
+                    type: array
+                    items: { $ref: '#/components/schemas/DriftComparisonResponse' }
+        '401': { description: Missing or revoked credential }
+        '403': { description: Repository scope denied }
+        '404': { description: Application not found }
+  /api/v1/drift/comparisons/{id}:
+    get:
+      operationId: getDriftComparison
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer }
+      responses:
+        '200':
+          description: Comparison by identifier, scoped to the tenant and both environments
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/DriftComparisonResponse' }
+        '401': { description: Missing or revoked credential }
+        '403': { description: Environment scope denied }
+        '404': { description: Comparison not found }
   /api/v1/releases:
     post:
       operationId: registerRelease
@@ -248,6 +317,29 @@ components:
       scheme: bearer
       description: Hashed, organization-scoped credential with read/report/observe and optional repository/environment restrictions
   schemas:
+    DriftComparisonResponse:
+      type: object
+      required: [id, repository, baseline_environment, target_environment, compared_at, status, result]
+      properties:
+        id: { type: integer }
+        repository: { type: string }
+        baseline_environment: { type: string }
+        target_environment: { type: string }
+        compared_at: { type: string, format: date-time }
+        status: { type: string, enum: [same, different, partial, unknown, stale] }
+        result:
+          type: object
+          required: [status, mode, verified_runtime, confidence, known_differences, incomplete_dimensions, baseline, target, dimensions]
+          properties:
+            status: { type: string }
+            mode: { type: string, enum: [reported, observed] }
+            verified_runtime: { type: boolean, const: false }
+            confidence: { type: string, enum: [partial, reported_only] }
+            known_differences: { type: array, items: { type: string } }
+            incomplete_dimensions: { type: array, items: { type: string } }
+            baseline: { type: object }
+            target: { type: object }
+            dimensions: { type: object }
     InventoryRequest:
       type: object
       required: [repository, artifact_identifier, format, sbom]
