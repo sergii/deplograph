@@ -1,6 +1,8 @@
 class User < ApplicationRecord
   has_secure_password
 
+  has_many :remediation_attempts, foreign_key: :created_by_id, dependent: :restrict_with_error
+  has_many :finding_verification_checks, foreign_key: :requested_by_id, dependent: :nullify
   has_many :memberships, dependent: :destroy
   has_many :organizations, through: :memberships
 

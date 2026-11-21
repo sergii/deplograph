@@ -466,6 +466,84 @@ paths:
         '401': { description: Missing or expired credential }
         '403': { description: One or both environment scopes denied }
         '404': { description: Finding does not belong to the organization }
+  /api/v1/findings/{id}/remediations:
+    get:
+      operationId: listFindingRemediations
+      summary: Read tracked remediation plans and reported deployment/scan evidence
+      description: |
+        Tenant- and repository-scoped. Read permission is checked for BOTH
+        environments. This endpoint never claims a reported fix was verified.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer }
+      responses:
+        '200':
+          description: Remediation evidence history, newest first
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [remediations]
+                properties:
+                  remediations:
+                    type: array
+                    items:
+                      type: object
+                      required: [id, status, description, reference_url, release_id, deployment_id, vulnerability_scan_run_id, created_at]
+                      properties:
+                        id: { type: integer }
+                        status: { type: string, enum: [planned, reported_applied, cancelled] }
+                        description: { type: string }
+                        reference_url: { type: [string, 'null'] }
+                        release_id: { type: [integer, 'null'] }
+                        deployment_id: { type: [integer, 'null'] }
+                        vulnerability_scan_run_id: { type: [integer, 'null'] }
+                        created_at: { type: string, format: date-time }
+        '401': { description: Missing or expired credential }
+        '403': { description: Both-environment scope check failed }
+        '404': { description: Finding is not in this organization }
+  /api/v1/findings/{id}/verifications:
+    get:
+      operationId: listFindingVerifications
+      summary: Read non-authoritative candidate verification history
+      description: |
+        Candidate-clear is NOT verified runtime remediation. No result
+        currently sets a finding to Resolved. Evidence is linked to immutable
+        comparisons and may be incomplete or stale.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer }
+      responses:
+        '200':
+          description: Verification checks, newest first
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [verifications]
+                properties:
+                  verifications:
+                    type: array
+                    items:
+                      type: object
+                      required: [id, comparison_id, remediation_attempt_id, trigger, outcome, reason_code, evidence_quality, authoritative, checked_at]
+                      properties:
+                        id: { type: integer }
+                        comparison_id: { type: integer }
+                        remediation_attempt_id: { type: [integer, 'null'] }
+                        trigger: { type: string, enum: [manual, new_comparison] }
+                        outcome: { type: string, enum: [still_affected, candidate_clear, inconclusive, policy_changed] }
+                        reason_code: { type: string }
+                        evidence_quality: { type: string }
+                        authoritative: { type: boolean, const: false }
+                        checked_at: { type: string, format: date-time }
+        '401': { description: Missing or expired credential }
+        '403': { description: Both-environment scope check failed }
+        '404': { description: Finding is not in this organization }
   /api/v1/releases:
     post:
       operationId: registerRelease

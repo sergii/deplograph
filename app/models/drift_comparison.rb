@@ -8,7 +8,9 @@ class DriftComparison < ApplicationRecord
   validates :status, inclusion: { in: %w[same different partial unknown stale] }
   validates :compared_at, presence: true
   has_many :drift_finding_events, dependent: :nullify
+  has_many :finding_verification_checks, dependent: :destroy
   after_create :materialize_findings
+  after_create :evaluate_remediations
 
   validate :all_resources_belong_to_organization
 
@@ -16,6 +18,10 @@ class DriftComparison < ApplicationRecord
 
   def materialize_findings
     Findings::IngestComparison.new.call(self)
+  end
+
+  def evaluate_remediations
+    Findings::EvaluateNewComparison.new.call(self)
   end
 
   def all_resources_belong_to_organization

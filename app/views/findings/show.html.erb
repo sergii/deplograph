@@ -16,6 +16,116 @@
   <div class="panel"><div class="muted small">First seen</div><h2><%= @finding.first_seen_at.utc.strftime("%d %b %H:%M UTC") %></h2></div>
   <div class="panel"><div class="muted small">Last seen</div><h2><%= @finding.last_seen_at.utc.strftime("%d %b %H:%M UTC") %></h2></div>
 </div>
+<section class="panel" style="margin-bottom:18px">
+  <div class="topline">
+    <div>
+      <h2>Remediation and verification</h2>
+      <p class="muted small">A deployed change is reported evidence, not proof that the problem is resolved.</p>
+    </div>
+    <span class="pill pill-<%= @verification_checks.first&.outcome || "unknown" %>"><%= @verification_checks.first&.outcome&.humanize || "Not checked" %></span>
+  </div>
+  <div class="grid-two">
+    <section>
+      <h3>Remediation history</h3>
+      <% if @remediations.empty? %>
+        <p class="muted small">No remediation has been recorded yet.</p>
+      <% else %>
+        <% @remediations.each do |attempt| %>
+          <div style="border-bottom:1px solid #e7edf5;padding:11px 0">
+            <div class="flex">
+              <span class="pill"><%= attempt.status.humanize %></span>
+              <span class="muted small"><%= attempt.created_at.utc.strftime("%d %b %H:%M UTC") %></span>
+            </div>
+            <p style="white-space:pre-wrap;margin-top:8px"><%= attempt.description %></p>
+            <% if attempt.reference_url.present? %>
+              <p><%= link_to "External change reference", attempt.reference_url, target: "_blank", rel: "noopener noreferrer", class: "small" %></p>
+            <% end %>
+            <div class="muted small">
+              <% if attempt.release %>Release #<%= attempt.release_id %> · <% end %>
+              <% if attempt.deployment %>Deployment #<%= attempt.deployment_id %> (<%= attempt.deployment.environment.name %>) · <% end %>
+              <% if attempt.vulnerability_scan_run %>OSV scan #<%= attempt.vulnerability_scan_run_id %> · <% end %>
+              Recorded by <%= attempt.created_by.email %>
+            </div>
+          </div>
+        <% end %>
+      <% end %>
+      <% if can_triage? %>
+        <h3 style="margin-top:21px">Record remediation</h3>
+        <%= form_with url: record_finding_remediation_path(@finding), method: :post, local: true do |f| %>
+          <div class="stack">
+            <div>
+              <%= f.label :status, "Remediation state" %>
+              <%= f.select :status, [["Planned", "planned"], ["Reported applied (requires deployment or scan)", "reported_applied"], ["Cancelled", "cancelled"]] %>
+            </div>
+            <div>
+              <%= f.label :description, "What changed or is planned?" %>
+              <%= f.text_area :description, maxlength: 3000, required: true, placeholder: "Document the intended fix and how to validate it" %>
+            </div>
+            <div>
+              <%= f.label :reference_url, "Change or PR URL (optional)" %>
+              <%= f.url_field :reference_url, placeholder: "https://github.com/...", maxlength: 2048 %>
+            </div>
+            <div>
+              <%= f.label :deployment_id, "Deployment evidence (optional)" %>
+              <%= f.select :deployment_id, options_for_select(@candidate_deployments.map { |d| ["##{d.id} · #{d.environment.name} · #{d.status}", d.id] }), { include_blank: "No linked deployment" } %>
+            </div>
+            <div>
+              <%= f.label :vulnerability_scan_run_id, "Advisory scan evidence (optional)" %>
+              <%= f.select :vulnerability_scan_run_id, options_for_select(@candidate_scans.map { |scan| ["##{scan.id} · #{scan.status} · snapshot #{scan.inventory_snapshot_id}", scan.id] }), { include_blank: "No linked scan" } %>
+            </div>
+            <div>
+              <%= f.label :release_id, "Release (optional)" %>
+              <%= f.select :release_id, options_for_select(@candidate_releases.map { |release| ["##{release.id} · #{release.name}", release.id] }), { include_blank: "No linked release" } %>
+            </div>
+            <%= f.submit "Record remediation", class: "btn btn-primary" %>
+          </div>
+        <% end %>
+      <% end %>
+    </section>
+    <section>
+      <h3>Verification checks</h3>
+      <% if @verification_checks.empty? %>
+        <p class="muted small">No verification attempted. A fresh comparison after reported remediation is required.</p>
+      <% else %>
+        <% @verification_checks.each do |check| %>
+          <div style="border-bottom:1px solid #e7edf5;padding:11px 0">
+            <div class="flex">
+              <span class="pill pill-<%= check.outcome %>"><%= check.outcome.humanize %></span>
+              <span class="muted small"><%= check.checked_at.utc.strftime("%d %b %H:%M UTC") %></span>
+            </div>
+            <p class="small"><%= check.reason_code.humanize %></p>
+            <p class="muted small">
+              <%= link_to "Comparison ##{check.drift_comparison_id}", drift_comparison_path(check.drift_comparison) %> ·
+              <%= check.trigger.humanize %> ·
+              <%= check.evidence_quality.humanize %> evidence ·
+              Not independently verified
+            </p>
+          </div>
+        <% end %>
+      <% end %>
+      <% if can_triage? %>
+        <h3 style="margin-top:21px">Check against a comparison</h3>
+        <%= form_with url: verify_finding_path(@finding), method: :post, local: true do |f| %>
+          <div class="stack">
+            <div>
+              <%= f.label :comparison_id, "Evidence from same application and environment pair" %>
+              <%= f.select :comparison_id,
+                options_for_select(@candidate_comparisons.map { |comparison|
+                  ["##{comparison.id} · #{comparison.mode} · #{comparison.status} · #{comparison.compared_at.utc.strftime("%d %b %H:%M")}", comparison.id]
+                }), { include_blank: "Select comparison" }, required: true %>
+            </div>
+            <%= f.submit "Evaluate evidence", class: "btn btn-primary" %>
+          </div>
+        <% end %>
+      <% end %>
+      <p class="muted small" style="margin-top:18px">
+        Candidate clear means the issue is no longer present in a fresh, sufficiently complete comparison.
+        It does not certify a finished rollout or change the finding to Resolved.
+      </p>
+    </section>
+  </div>
+</section>
+
 <div class="grid-two">
   <section class="panel">
     <h2>Evidence and next steps</h2>

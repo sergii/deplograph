@@ -39,6 +39,26 @@ class FindingsController < ApplicationController
     @history = @finding.drift_finding_events
       .includes(:actor, :drift_comparison).order(created_at: :desc, id: :desc).limit(100)
     @members = current_organization.users.order(:email)
+    @remediations = @finding.remediation_attempts
+      .includes(:created_by, :release, :deployment, :vulnerability_scan_run)
+      .order(created_at: :desc, id: :desc).limit(30)
+    @verification_checks = @finding.finding_verification_checks
+      .includes(:drift_comparison, :remediation_attempt, :requested_by)
+      .order(checked_at: :desc, id: :desc).limit(30)
+    @candidate_comparisons = current_organization.drift_comparisons
+      .where(application: @finding.application,
+        baseline_environment: @finding.baseline_environment,
+        target_environment: @finding.target_environment,
+        mode: @finding.latest_comparison.mode)
+      .order(compared_at: :desc, id: :desc).limit(30)
+    @candidate_deployments = @finding.application.environments
+      .where(id: [@finding.baseline_environment_id, @finding.target_environment_id])
+      .flat_map { |environment| environment.deployments.includes(:artifact).order(deployed_at: :desc).limit(30).to_a }
+    @candidate_scans = VulnerabilityScanRun
+      .joins(inventory_snapshot: { artifact: :application })
+      .where(applications: { id: @finding.application_id })
+      .order(started_at: :desc, id: :desc).limit(30)
+    @candidate_releases = @finding.application.releases.order(id: :desc).limit(30)
   end
 
   def update
@@ -57,6 +77,35 @@ class FindingsController < ApplicationController
       can_classify: can_classify?, **changed)
     redirect_to finding_path(finding), notice: "Finding updated"
   rescue Findings::UpdateFinding::TransitionDenied, ActiveRecord::RecordInvalid
+    head :unprocessable_entity
+  end
+
+
+  def record_remediation
+    return head :forbidden unless can_triage?
+
+    finding = scoped_findings.find(params[:id])
+    allowed = params.permit(:status, :description, :reference_url,
+      :release_id, :deployment_id, :vulnerability_scan_run_id)
+    Findings::RecordRemediation.new.call(
+      finding: finding, actor: current_user, **allowed.to_h.symbolize_keys
+    )
+    redirect_to finding_path(finding), notice: "Remediation evidence recorded"
+  rescue Findings::RecordRemediation::InvalidAttempt, ActiveRecord::RecordInvalid
+    head :unprocessable_entity
+  end
+
+  def verify
+    return head :forbidden unless can_triage?
+
+    finding = scoped_findings.find(params[:id])
+    comparison = current_organization.drift_comparisons.find(params.require(:comparison_id))
+    check = Findings::VerifyRemediation.new.call(
+      finding: finding, comparison: comparison, trigger: "manual",
+      actor: current_user
+    )
+    redirect_to finding_path(finding), notice: "Verification check: #{check.outcome.humanize}"
+  rescue Findings::VerifyRemediation::InvalidComparison
     head :unprocessable_entity
   end
 

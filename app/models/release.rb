@@ -1,4 +1,5 @@
 class Release < ApplicationRecord
+  has_many :remediation_attempts, dependent: :nullify
   belongs_to :application
   belongs_to :source_revision, optional: true
   has_many :release_artifacts, dependent: :destroy
