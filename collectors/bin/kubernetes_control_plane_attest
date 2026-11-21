@@ -1,0 +1,39 @@
+#!/usr/bin/env ruby
+# frozen_string_literal: true
+
+require_relative "../lib/deplograph/kubernetes_control_plane_attestor"
+
+begin
+  expected = JSON.parse(ENV.fetch("DEPLOGRAPH_EXPECTED_WORKLOADS"))
+  client = Deplograph::RuntimeCollectors::ControlPlaneApi.new(
+    host: ENV.fetch("KUBERNETES_SERVICE_HOST"),
+    port: ENV.fetch("KUBERNETES_SERVICE_PORT", "443").to_i,
+    token_file: ENV.fetch("KUBERNETES_TOKEN_FILE",
+      "/var/run/secrets/kubernetes.io/serviceaccount/token"),
+    ca_file: ENV.fetch("KUBERNETES_CA_FILE",
+      "/var/run/secrets/kubernetes.io/serviceaccount/ca.crt")
+  )
+  collector = Deplograph::RuntimeCollectors::KubernetesControlPlaneAttestor.new(
+    namespace: ENV.fetch("DEPLOGRAPH_NAMESPACE"),
+    expected_workloads: expected, image_repository: ENV.fetch("DEPLOGRAPH_IMAGE_REPOSITORY"),
+    client: client
+  )
+  publisher = Deplograph::RuntimeCollectors::SignedAttestationPublisher.new(
+    url: ENV.fetch("DEPLOGRAPH_ATTESTATION_URL"),
+    token: ENV.fetch("DEPLOGRAPH_TOKEN"),
+    private_key_file: ENV.fetch("DEPLOGRAPH_SIGNING_KEY_FILE"),
+    attestor_id: ENV.fetch("DEPLOGRAPH_ATTESTOR_ID"),
+    repository: ENV.fetch("DEPLOGRAPH_REPOSITORY"),
+    environment: ENV.fetch("DEPLOGRAPH_ENVIRONMENT")
+  )
+
+  result = publisher.publish(collector.collect)
+  puts JSON.generate({
+    attestation_id: result.fetch("id"), signature_verified: result.fetch("signature_verified"),
+    complete: result.fetch("complete"), resolved_findings: result.fetch("resolutions").size
+  })
+rescue StandardError => error
+  # Avoid printing Kubernetes tokens, signing key bytes or raw Pod objects.
+  warn "Kubernetes control-plane attestation failed: #{error.class}"
+  exit 1
+end
