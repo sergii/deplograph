@@ -5,7 +5,8 @@ ARG RUBY_BASE_IMAGE=ruby:4.0.10-slim
 FROM ${RUBY_BASE_IMAGE}
 
 WORKDIR /app
-COPY --chown=65534:65534 collectors/ /app/collectors/
+COPY --chown=65534:65534 bin/ /app/collectors/bin/
+COPY --chown=65534:65534 lib/ /app/collectors/lib/
 
 ENV HOME=/tmp
 USER 65534:65534
