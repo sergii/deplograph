@@ -1,0 +1,15 @@
+{
+  "repository": "acme/payments",
+  "environment": "staging",
+  "source": "github_actions",
+  "scope": "declared",
+  "workload": "web",
+  "collection_id": "staging-demo-1",
+  "collected_at": "2026-11-21T12:00:00Z",
+  "completeness": "complete",
+  "keys": [
+    "DATABASE_URL",
+    "REDIS_URL",
+    "FEATURE_NEW_CHECKOUT"
+  ]
+}
