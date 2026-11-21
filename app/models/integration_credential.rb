@@ -7,6 +7,7 @@ class IntegrationCredential < ApplicationRecord
   TOKEN_PATTERN = /\Adpl_([0-9a-f]{16})_([0-9a-f]{64})\z/
 
   belongs_to :organization
+  has_many :runtime_attestors, dependent: :destroy
   has_many :integration_audit_events, dependent: :destroy
 
   validates :name, presence: true
