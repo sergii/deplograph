@@ -49,10 +49,13 @@ class FindingsController < ApplicationController
       return head :forbidden
     end
 
-    Findings::UpdateFinding.new.call(finding: finding, actor: current_user, **changed)
+    Findings::UpdateFinding.new.call(finding: finding, actor: current_user,
+      can_classify: can_classify?, **changed)
     redirect_to finding_path(finding), notice: "Finding updated"
-  rescue Findings::UpdateFinding::TransitionDenied, ActiveRecord::RecordInvalid, ActiveRecord::RecordNotFound
+  rescue Findings::UpdateFinding::TransitionDenied, ActiveRecord::RecordInvalid
     head :unprocessable_entity
+  rescue ActiveRecord::RecordNotFound
+    head :not_found
   end
 
   private
