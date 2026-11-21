@@ -42,6 +42,8 @@ class FindingsController < ApplicationController
     @remediations = @finding.remediation_attempts
       .includes(:created_by, :release, :deployment, :vulnerability_scan_run)
       .order(created_at: :desc, id: :desc).limit(30)
+    @resolutions = @finding.finding_resolutions
+      .includes(runtime_attestation: :runtime_attestor).order(resolved_at: :desc).limit(20)
     @verification_checks = @finding.finding_verification_checks
       .includes(:drift_comparison, :remediation_attempt, :requested_by)
       .order(checked_at: :desc, id: :desc).limit(30)
