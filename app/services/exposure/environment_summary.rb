@@ -9,6 +9,7 @@ module Exposure
           .order(observed_at: :desc, id: :desc).to_a.uniq(&:workload)
 
         {
+          verification_status: verification_status(latest_report, observations),
           name: environment.name, kind: environment.kind,
           state: environment.state, expires_at: environment.expires_at,
           reported: latest_report && {
@@ -26,6 +27,19 @@ module Exposure
     end
 
     private
+
+    def verification_status(deployment, observations)
+      return "unverified" if observations.empty?
+      return "stale" if observations.any? { |obs| obs.observed_at < Time.current - MAX_FRESHNESS }
+      return "observations_only" unless deployment
+
+      expected_digest = deployment.artifact.image_digest
+      return "unknown" unless expected_digest
+      return "conflicting_observation" if observations.any? { |obs| obs.image_digest != expected_digest }
+
+      # One observed workload never proves that every replica has rolled out.
+      "partial"
+    end
 
     def represent(observation)
       artifact = observation.artifact
