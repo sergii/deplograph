@@ -2,7 +2,7 @@ module Integrations
   class DeploymentEventIngestor
     class Conflict < StandardError; end
 
-    SOURCES = %w[github_actions kamal kubernetes kamal_agent docker_agent aws_ecs].freeze
+    SOURCES = %w[ci github_actions kamal kubernetes kamal_agent docker_agent aws_ecs].freeze
     OBSERVERS = %w[kubernetes kamal_agent docker_agent aws_ecs].freeze
     TYPES = %w[deployment.reported artifact.observed].freeze
     MAX_EVENT_AGE = 365.days
@@ -81,9 +81,10 @@ module Integrations
           if environment.last_observed_at.nil? || occurred > environment.last_observed_at
             environment.update!(last_observed_at: occurred)
           end
+          # A single observed container is not proof of a complete rollout.
           if deployment && deployment.artifact.image_digest == digest
             if deployment.observed_at.nil? || occurred > deployment.observed_at
-              deployment.update!(observed_at: occurred, status: "observed")
+              deployment.update!(observed_at: occurred)
             end
           end
         elsif environment.last_reported_at.nil? || occurred > environment.last_reported_at
