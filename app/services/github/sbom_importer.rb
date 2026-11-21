@@ -31,6 +31,9 @@ module Github
       client = HttpClient.new(token: token)
       path = "/repos/#{grant.full_name}/dependency-graph/sbom"
       uuid = grant.sbom_report_uuid
+      if uuid.present? && grant.sbom_requested_at.present? && grant.sbom_requested_at < 6.days.ago
+        uuid = nil
+      end
 
       if uuid.blank?
         generated = client.get("#{path}/generate-report")
@@ -42,7 +45,8 @@ module Github
           parsed && "#{parsed[1]}/#{parsed[2]}".casecmp?(grant.full_name)
 
         uuid = parsed[3].downcase
-        grant.update!(sbom_report_uuid: uuid, sbom_sync_status: "pending",
+        grant.update!(sbom_report_uuid: uuid, sbom_requested_at: Time.current,
+          sbom_sync_status: "pending",
           last_import_error: nil)
       end
 
@@ -73,7 +77,8 @@ module Github
         document: spdx, format: "spdx", kind: "source", source: "github"
       )
 
-      grant.update!(sbom_report_uuid: nil, sbom_sync_status: "completed",
+      grant.update!(sbom_report_uuid: nil, sbom_requested_at: nil,
+        sbom_sync_status: "completed",
         last_imported_at: Time.current, last_import_error: nil)
       if ENV["OSV_ENABLED"] == "true" && snapshot.match_status == "not_scanned"
         Vulnerabilities::MatchSnapshotJob.perform_later(snapshot.id)
