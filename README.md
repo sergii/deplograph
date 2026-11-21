@@ -416,3 +416,64 @@ can reveal whether a value has changed, and ENV names may expose architecture.
 This MVP does not implement user-facing policy editing, KMS-backed key
 distribution, key compromise detection, threshold alerts, or verified
 collector attestation. Those belong to future PRs.
+
+
+## Drift Dashboard & Findings (stacked PR #9)
+
+A logged-in organization member can now open \`/drift\` to see recent
+environment comparisons, filter by application, inspect reported versus
+observed evidence, and run new reported/observed comparisons where the
+necessary data exists. The \`/findings\` page presents actionable drift,
+incomplete evidence, status, priority, assigned owner and the latest comparison.
+
+### Finding lifecycle
+
+Every new \`DriftComparison\` is inspected for actionable differences and
+evidence gaps. A stable SHA-256 fingerprint identifies the same type of
+problem across repeat comparisons for the same application, environment
+pair and evidence mode. Repeated observations update \`last_seen_at\` and
+the latest evidence pointer, but do not reset workflow status or owner.
+The original evidence remains accessible in immutable comparison history.
+
+Supported workflow states: \`open\`, \`acknowledged\`, \`investigating\`,
+\`verification_pending\`, \`dismissed\`, \`resolved\`. Current operators
+**cannot manually set \`resolved\`**. Deplograph requires a future
+independent verification path proving that a remediation is running.
+A new deployment report or an unverified observed digest does not qualify.
+Dismissal requires an explanatory audit note and is not equivalent to
+a security fix.
+
+Findings retain the exact comparison ID, first/last seen timestamps,
+category, severity, priority, owner and next action. The audit trail
+records status changes, ownership changes, notes and priority/severity
+reclassification. Findings may include a known difference even when
+evidence confidence is partial. Unknown/stale data creates evidence-gap
+findings, not false "healthy" statuses.
+
+The initial priority classification is operational triage, not a CVSS
+score. Advisories from unscored sources have \`severity=unknown\`;
+operators can set a reviewed severity. A comparison status of \`same\`
+for HMAC policies means policy compliance, not identical ENV values.
+Expected/ignored HMAC differences do not become findings.
+
+### Access control
+
+- Browser \`/drift\`, \`/drift/comparisons/:id\`, \`/findings\`, \`/findings/:id\`
+  require local login and an active membership of the selected organization.
+- Owners/admins can update priority, severity, triage status, assignee,
+  notes and next action. Members may triage and assign; viewers are read-only.
+- The read-only \`GET /api/v1/findings\` and \`GET /api/v1/findings/:id\`
+  endpoints require scoped \`read\` credentials. List filtering is performed
+  at the SQL level using the credential's repository and environment grants
+  before applying the 100-result limit. No raw HMACs or ENV values are returned.
+- Dashboard and finding views use Rails auto-escaping and CSRF-protected
+  forms. No public sign-up or unauthenticated access is introduced.
+
+This PR only implements an operational browser dashboard and persisted
+findings. It does **not** install a GitHub App, create live collectors,
+verify a complete runtime rollout or add email/Slack alerting.
+
+Run the full Minitest suite with \`bin/rails test\`, or the new UI/API
+tests with \`bin/rails test test/integration/findings_dashboard_test.rb
+test/integration/findings_api_test.rb\`. The frontend is server-rendered
+Rails/ERB, with no new JavaScript dependencies.
