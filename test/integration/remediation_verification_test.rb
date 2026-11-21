@@ -18,7 +18,7 @@ class RemediationVerificationTest < ActionDispatch::IntegrationTest
 
     @initial = compare_artifact(status: "different", compared_at: 4.hours.ago)
     @finding = @organization.drift_findings.find_by!(category: "artifact_drift")
-    digest = "sha256:" + "a" * 64
+    digest = "sha256:" + "b" * 64
     @artifact = @application.artifacts.create!(
       kind: "image", image_digest: digest,
       identifier: "oci:ghcr.io/acme/payments@#{digest}"
