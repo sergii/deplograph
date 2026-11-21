@@ -544,6 +544,118 @@ paths:
         '401': { description: Missing or expired credential }
         '403': { description: Both-environment scope check failed }
         '404': { description: Finding is not in this organization }
+  /api/v1/runtime/attestation_challenges:
+    post:
+      operationId: issueRuntimeAttestationChallenge
+      summary: Obtain one-time, credential-scoped Ed25519 challenge
+      description: |
+        Observe credential must match the enrolled Kubernetes attestor and
+        its organization, application and environment. Challenges expire
+        after five minutes and may only be consumed once.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [attestor_id]
+              properties:
+                attestor_id: { type: integer }
+      responses:
+        '201':
+          description: Unique one-time challenge
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [attestor_id, nonce, expires_at]
+                properties:
+                  attestor_id: { type: integer }
+                  nonce: { type: string, minLength: 64, maxLength: 64 }
+                  expires_at: { type: string, format: date-time }
+        '401': { description: Missing credential }
+        '403': { description: Attestor not enrolled for the credential }
+        '404': { description: Attestor not found in organization }
+        '429': { description: Too many outstanding challenges }
+  /api/v1/runtime/attestations:
+    post:
+      operationId: submitSignedRuntimeAttestation
+      summary: Verify signed, challenge-bound full-workload Kubernetes report
+      description: |
+        Ed25519 signature covers deterministically key-sorted JSON claims.
+        The collector key and an owner/admin-approved workload contract are
+        required. Only complete, fresh, matching target image evidence can
+        resolve an existing artifact-drift finding after a candidate-clear
+        verification. No CVE or ENV finding is auto-resolved.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [attestor_id, attestation, signature]
+              properties:
+                attestor_id: { type: integer }
+                signature: { type: string }
+                attestation:
+                  type: object
+                  additionalProperties: false
+                  required: [version, nonce, attestor_id, observation_id, repository, environment, image_repository, image_digest, observed_at, workloads]
+                  properties:
+                    version: { type: integer, const: 1 }
+                    nonce: { type: string }
+                    attestor_id: { type: integer }
+                    observation_id: { type: string }
+                    repository: { type: string }
+                    environment: { type: string }
+                    image_repository: { type: string }
+                    image_digest: { type: string }
+                    observed_at: { type: string, format: date-time }
+                    workloads:
+                      type: array
+                      minItems: 1
+                      maxItems: 20
+                      items:
+                        type: object
+                        required: [name, desired_replicas, ready_replicas, replicas]
+                        properties:
+                          name: { type: string }
+                          desired_replicas: { type: integer }
+                          ready_replicas: { type: integer }
+                          replicas:
+                            type: array
+                            maxItems: 1000
+                            items:
+                              type: object
+                              required: [uid, ready, image_digest]
+                              properties:
+                                uid: { type: string }
+                                ready: { type: boolean }
+                                image_digest: { type: string }
+      responses:
+        '201':
+          description: Signed observation accepted and any eligible findings resolved
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [id, observation_id, complete, ready_replicas, signature_verified, resolutions]
+                properties:
+                  id: { type: integer }
+                  observation_id: { type: string }
+                  complete: { type: boolean }
+                  ready_replicas: { type: integer }
+                  signature_verified: { type: boolean }
+                  resolutions:
+                    type: array
+                    items: { type: integer }
+        '401': { description: Missing credential }
+        '403': { description: Source credential revoked or out of scope }
+        '404': { description: Challenge not found }
+        '409': { description: Consumed or expired challenge }
+        '422': { description: Invalid signature, fields or stale observation }
   /api/v1/releases:
     post:
       operationId: registerRelease

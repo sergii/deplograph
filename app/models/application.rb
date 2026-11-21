@@ -1,5 +1,6 @@
 class Application < ApplicationRecord
   belongs_to :organization
+  has_many :runtime_attestors, dependent: :destroy
   has_many :drift_findings, dependent: :destroy
   has_many :configuration_policies, dependent: :destroy
   has_many :drift_comparisons, dependent: :destroy

@@ -14,6 +14,11 @@ Rails.application.routes.draw do
     as: :record_finding_remediation
   post "/findings/:id/verifications", to: "findings#verify",
     as: :verify_finding
+  resources :runtime_attestors, only: %i[index create] do
+    member do
+      post :revoke
+    end
+  end
   get "/github/installations", to: "github/installations#index", as: :github_installations
   get "/github/installations/setup", to: "github/installations#setup", as: :github_installation_setup
   post "/github/installations/authorize", to: "github/installations#authorize", as: :authorize_github_installation
@@ -45,6 +50,8 @@ Rails.application.routes.draw do
       post "configuration/fingerprints/drift", to: "configuration_fingerprint_drifts#create"
       get "configuration/policies", to: "configuration_policies#index"
       put "configuration/policies", to: "configuration_policies#upsert"
+      post "runtime/attestation_challenges", to: "runtime_attestation_challenges#create"
+      post "runtime/attestations", to: "runtime_attestations#create"
       post "integration_events", to: "integration_events#create"
       post "github/webhooks", to: "github_webhooks#create"
     end

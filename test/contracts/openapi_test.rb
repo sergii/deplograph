@@ -7,6 +7,8 @@ class OpenapiTest < ActiveSupport::TestCase
     "/api/v1/inventories/lockfile" => { "post" => "201" },
     "/api/v1/drift/comparisons" => { "post" => "201", "get" => "200" },
     "/api/v1/findings" => { "get" => "200" },
+    "/api/v1/runtime/attestation_challenges" => { "post" => "201" },
+    "/api/v1/runtime/attestations" => { "post" => "201" },
     "/api/v1/findings/{id}/remediations" => { "get" => "200" },
     "/api/v1/findings/{id}/verifications" => { "get" => "200" },
     "/api/v1/configuration_snapshots" => { "post" => "201", "get" => "200" },

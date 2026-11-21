@@ -1,5 +1,5 @@
 class DriftFindingEvent < ApplicationRecord
-  ACTIONS = %w[detected observed status_changed note_added assigned priority_changed severity_changed next_action_changed remediation_recorded verification_checked].freeze
+  ACTIONS = %w[detected observed status_changed note_added assigned priority_changed severity_changed next_action_changed remediation_recorded verification_checked verified_resolution reopened].freeze
 
   belongs_to :drift_finding
   belongs_to :drift_comparison, optional: true

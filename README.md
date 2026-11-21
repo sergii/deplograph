@@ -550,3 +550,120 @@ attestation and explicit coverage contract, a source-verified resolution
 transition, correct handling of later reoccurrences, and at-least-once
 verification scheduling with retries. Avoid treating candidate-clear as a
 security assurance until those are delivered.
+
+
+## Trusted runtime attestation and verified artifact resolution (stacked PR #11)
+
+This opt-in stage adds owner/admin-enrolled **Ed25519 public keys**, a
+fixed workload/replica-count coverage contract, short-lived one-use challenges
+and a Kubernetes control-plane agent that signs a bounded runtime assertion.
+
+A normal \`artifact.observed\` event is **still partial**. A successful
+Ed25519 signature authenticates the enrolled key, not the integrity of the
+cluster, the attestor process or the signing key. The owner/admin who enables
+\`resolution_enabled\` is explicitly accepting that trust boundary. There is
+no vendor-independent hardware/TPM attestation, and this is not equivalent
+to an external security audit.
+
+### Enrollment and key custody
+
+1. Issue an organization integration credential scoped to exactly one
+   \`repository\` and \`environment\`, with \`provider=kubernetes\` and
+   \`permissions=["observe"]\`.
+2. Provision a unique Ed25519 key pair with the private key held out of
+   source control on a read-only, restricted mount in the monitoring workload.
+   Never submit the private key to Deplograph.
+3. Open \`/runtime_attestors\` as an organization **owner/admin**. Register
+   the application/environment, credential, registry image repository and
+   the exact current workload/replica contract (e.g.
+   \`{"web":2,"worker":1}\`). Upload the **public** key.
+4. The \`resolution_enabled\` checkbox is an explicit authorization to
+   close **artifact-drift** findings only. Unchecked keys can submit
+   signed observations but cannot close findings. Revoked keys cannot
+   issue or consume new challenges.
+
+### Read-only Kubernetes collector
+
+\`collectors/bin/kubernetes_control_plane_attest\` is a one-shot Ruby client.
+See \`collectors/examples/kubernetes-control-plane-attestor.yaml\` for a
+starting CronJob and namespace-scoped RBAC. Package and version-pin its
+container yourself; the sample contains a placeholder image and is **not**
+deployed by this PR.
+
+It reads Deployment status and observedGeneration, desired and ready
+replica counts, owned ReplicaSets and running Pod containerStatuses, verifies
+ownerReferences, excludes terminating/unready Pods, and checks each resolved
+registry \`repo@sha256:digest\`. The agent refuses to sign if a covered
+workload is incomplete, the declared workload set is inconsistent, or
+image digests are mixed.
+
+Required environment:
+- \`DEPLOGRAPH_ATTESTATION_URL\`: HTTPS URL ending
+  \`/api/v1/runtime/attestations\`
+- \`DEPLOGRAPH_TOKEN\`: the *enrolled* scoped Kubernetes observe token
+- \`DEPLOGRAPH_ATTESTOR_ID\`: server registration ID
+- \`DEPLOGRAPH_REPOSITORY\`, \`DEPLOGRAPH_ENVIRONMENT\`
+- \`DEPLOGRAPH_NAMESPACE\`, \`DEPLOGRAPH_IMAGE_REPOSITORY\`
+- \`DEPLOGRAPH_EXPECTED_WORKLOADS\`: JSON object matching the registered contract
+- \`DEPLOGRAPH_SIGNING_KEY_FILE\`: protected local Ed25519 private-key PEM
+- \`KUBERNETES_SERVICE_HOST\`; optional \`KUBERNETES_SERVICE_PORT\`,
+  \`KUBERNETES_TOKEN_FILE\` and \`KUBERNETES_CA_FILE\`
+
+Only counts, workload names, Pod UIDs and image digests are sent. PodSpecs
+and Kubernetes Secrets are never transmitted.
+
+The signing client first requests a fresh one-time nonce from
+\`POST /api/v1/runtime/attestation_challenges\`, canonicalizes the ordered
+claims using recursively lexicographically sorted JSON keys, and signs
+the bytes with Ed25519. It posts the assertion and Base64 signature to
+\`POST /api/v1/runtime/attestations\`. Signatures cover attestor ID,
+organization-bound repository/environment, nonce, observation ID,
+observation time, image digest and all workload replicas. The server
+verifies freshness, source scopes, one-time nonce, valid signature,
+approved source, exact expected workload names and replica readiness.
+Consumed nonces cannot be reused.
+
+### Narrow verified-resolution policy
+
+Deplograph can automatically resolve **only an \`artifact_drift\` finding**
+when all these conditions are true:
+
+- an owner/admin explicitly enabled this Kubernetes control-plane
+  attestor, it remains active, and the target environment is active;
+- its signed attestation is fresh, complete against the admin-pinned
+  multi-workload replica contract and reports one consistent OCI digest;
+- a prior, recent \`candidate_clear\` check matches an applied remediation
+  with a recorded target-environment deployment using **the same digest**;
+- that comparison is still the latest for the same ordered environment
+  pair, is later than the recorded remediation and shows the same
+  baseline/target OCI digest; and
+- the attestation was observed after the candidate-clear comparison and
+  deployed artifact, not before.
+
+An immutable \`FindingResolution\` links the finding, attestation, original
+remediation attempt and verification check. \`resolved_at\` and a
+\`verified_resolution\` audit event are written transactionally. If the
+same drift reappears after resolution, the finding reopens and retains
+the previous resolution evidence.
+
+**CVE/security findings, ENV names, HMAC value differences, dependency
+changes and release mappings are NOT eligible for this automatic closure.**
+Those require their own independent, appropriately scoped evidence rules.
+An attestor that only reports one pod/replica or a wrong digest can never
+close a finding. Reported deployment evidence alone is still insufficient.
+Manual \`resolved\` remains blocked.
+
+### Threat model and limits
+
+A stolen signing private key and observe credential can forge a report
+inside the approved tenant scope. Operator enrollment and private-key
+protection are essential. Kubernetes RBAC verifies what an authorized
+observer can read, but a compromised control plane can still lie.
+Replica contract changes require explicit owner/admin review. Attestation
+receipts alone are not proof of CVE remediation, secret correctness or
+that the runtime remains unchanged after the observation. Revocation
+blocks future attestations; it does not retroactively remove the audit log.
+
+Tests use a synthetic Kubernetes control plane and generated Ed25519 test
+keys. No actual production deployment, real key provisioning, or live
+cluster smoke test was performed.

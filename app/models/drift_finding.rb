@@ -10,6 +10,7 @@ class DriftFinding < ApplicationRecord
   belongs_to :target_environment, class_name: "Environment"
   belongs_to :latest_comparison, class_name: "DriftComparison"
   belongs_to :assigned_to, class_name: "User", optional: true
+  has_many :finding_resolutions, dependent: :destroy
   has_many :finding_verification_checks, dependent: :destroy
   has_many :remediation_attempts, dependent: :destroy
   has_many :drift_finding_events, dependent: :destroy
