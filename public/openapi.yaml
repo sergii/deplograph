@@ -34,6 +34,7 @@ paths:
                   dependency_count: { type: integer }
                   match_status: { type: string }
         '401': { description: Unauthorized }
+        '409': { description: Artifact identity conflict }
         '422': { description: Invalid import }
   /api/v1/releases:
     post:
@@ -98,6 +99,13 @@ paths:
     post:
       operationId: ingestIntegrationEvent
       summary: Correlate deployment reports and independent runtime observations
+      description: |
+        deployment.reported uses IngestionToken. artifact.observed requires a
+        dedicated, source-bound ObserverToken configured for the collector type.
+        Observations are partial evidence, not proof of completed rollout.
+      security:
+        - IngestionToken: []
+        - ObserverToken: []
       requestBody:
         required: true
         content:
@@ -119,8 +127,9 @@ paths:
                   environment_id: { type: integer }
                   deployment_id: { type: [integer, 'null'] }
         '401': { description: Unauthorized }
-        '409': { description: Event ID conflict }
+        '409': { description: Event or artifact identity conflict }
         '422': { description: Invalid event }
+        '503': { description: Runtime collector credentials are not configured }
   /api/v1/environments:
     get:
       operationId: listEnvironmentExposure
@@ -202,6 +211,10 @@ components:
     IngestionToken:
       type: http
       scheme: bearer
+    ObserverToken:
+      type: http
+      scheme: bearer
+      description: Source-bound runtime collector credential
   schemas:
     InventoryRequest:
       type: object
@@ -248,11 +261,14 @@ components:
         release: { type: string }
     EnvironmentSummary:
       type: object
-      required: [name, kind, state, reported, observed]
+      required: [name, kind, state, verification_status, reported, observed]
       properties:
         name: { type: string }
         kind: { type: string }
         state: { type: string }
+        verification_status:
+          type: string
+          enum: [unverified, partial, stale, observations_only, unknown, conflicting_observation]
         expires_at: { type: [string, 'null'], format: date-time }
         reported:
           type: [object, 'null']
