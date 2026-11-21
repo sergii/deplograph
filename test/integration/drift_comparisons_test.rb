@@ -114,6 +114,30 @@ class DriftComparisonsTest < ActionDispatch::IntegrationTest
       response.parsed_body.dig("result", "dimensions", "security", "status")
   end
 
+  test "stale observations do not assert current drift even when historic images differed" do
+    observed(@staging, @staging_artifact, event: "stage-stale", workload: "web")
+    observed(@production, @production_artifact, event: "prod-stale", workload: "web")
+    DeploymentObservation.update_all(observed_at: 3.hours.ago)
+    import(@production_artifact, rack: "3.1.0")
+    import(@staging_artifact, rack: "3.2.0")
+
+    post_compare(mode: "observed")
+    assert_response :created
+    result = response.parsed_body.fetch("result")
+    assert_equal "stale", result.fetch("status")
+    assert_equal true, result.fetch("baseline").fetch("stale")
+    assert_equal true, result.fetch("target").fetch("stale")
+    assert_equal false, result.fetch("verified_runtime")
+  end
+
+  test "no runtime observations means unknown, not equal deployment state" do
+    post_compare(mode: "observed")
+    assert_response :created
+    result = response.parsed_body.fetch("result")
+    assert_equal "unknown", result.fetch("status")
+    assert_equal false, result.fetch("verified_runtime")
+  end
+
   test "history and individual comparisons remain isolated by tenant and environment scope" do
     import(@production_artifact, rack: "3.1.0")
     import(@staging_artifact, rack: "3.2.0")
