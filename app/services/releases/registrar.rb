@@ -44,12 +44,10 @@ module Releases
           identifier = entry.fetch("identifier")
           raise ArgumentError, "Artifact identity must contain digest" unless identifier.include?(digest)
 
-          artifact = app.artifacts.find_or_initialize_by(identifier: identifier)
-          if artifact.persisted? && artifact.image_digest.present? && artifact.image_digest != digest
-            raise Conflict, "Artifact identifier already refers to another digest"
-          end
-          artifact.assign_attributes(kind: "image", image_digest: digest, commit_sha: sha)
-          artifact.save!
+          artifact = Artifacts::Registrar.new.call(
+            application: app, identifier: identifier, kind: "image",
+            image_digest: digest, commit_sha: sha
+          )
           release.release_artifacts.find_or_create_by!(artifact: artifact)
           build&.build_artifacts&.find_or_create_by!(artifact: artifact)
         end
