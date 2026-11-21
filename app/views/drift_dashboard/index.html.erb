@@ -1,0 +1,74 @@
+<div class="topline">
+  <div>
+    <div class="eyebrow">Environment intelligence</div>
+    <h1>Drift comparisons</h1>
+    <p class="muted">Evidence-qualified differences across releases, runtime and configuration.</p>
+  </div>
+  <%= link_to "View findings", findings_path, class: "btn btn-primary" %>
+</div>
+
+<div class="metrics">
+  <div class="panel"><div class="muted small">Comparisons shown</div><div class="metric-number"><%= @comparisons.size %></div></div>
+  <div class="panel"><div class="muted small">Open findings</div><div class="metric-number"><%= @open_count %></div></div>
+  <div class="panel"><div class="muted small">Incomplete evidence</div><div class="metric-number"><%= @evidence_gaps %></div></div>
+  <div class="panel"><div class="muted small">Applications</div><div class="metric-number"><%= @applications.size %></div></div>
+</div>
+
+<% if can_triage? %>
+  <section class="panel" style="margin-bottom:18px">
+    <h2>Run a comparison</h2>
+    <p class="muted small">Reported deployments are declarations. Runtime observations remain partial until coverage is independently verified.</p>
+    <%= form_with url: create_browser_comparison_path, method: :post, local: true do |f| %>
+      <div class="filters">
+        <div>
+          <%= f.label :application_id, "Application" %>
+          <%= f.collection_select :application_id, @applications, :id, :repository_full_name, { prompt: "Choose application" }, required: true %>
+        </div>
+        <div>
+          <%= f.label :baseline_environment, "Baseline environment" %>
+          <%= f.text_field :baseline_environment, placeholder: "staging", required: true %>
+        </div>
+        <div>
+          <%= f.label :target_environment, "Target environment" %>
+          <%= f.text_field :target_environment, placeholder: "production", required: true %>
+        </div>
+        <div>
+          <%= f.label :mode, "Evidence mode" %>
+          <%= f.select :mode, [["Deployment reports", "reported"], ["Runtime observations", "observed"]] %>
+        </div>
+        <%= f.submit "Compare", class: "btn btn-primary" %>
+      </div>
+    <% end %>
+  </section>
+<% end %>
+
+<section class="panel">
+  <div class="topline">
+    <h2>Recent comparisons</h2>
+    <%= form_with url: drift_dashboard_path, method: :get, local: true, class: "flex" do |f| %>
+      <%= f.select :application_id, options_from_collection_for_select(@applications, :id, :repository_full_name, params[:application_id]), { include_blank: "All applications" } %>
+      <%= f.submit "Filter", class: "btn" %>
+    <% end %>
+  </div>
+  <% if @comparisons.empty? %>
+    <div class="empty">No comparison history yet. Run a comparison, or import example inventory and deployment data.</div>
+  <% else %>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>Application</th><th>Environments</th><th>Mode</th><th>Result</th><th>Confidence</th><th>Compared</th></tr></thead>
+        <tbody>
+          <% @comparisons.each do |comparison| %>
+            <tr>
+              <td><%= link_to comparison.application.repository_full_name, drift_comparison_path(comparison) %></td>
+              <td><%= comparison.baseline_environment.name %> → <%= comparison.target_environment.name %></td>
+              <td><%= comparison.mode.humanize %></td>
+              <td><span class="pill pill-<%= comparison.status %>"><%= comparison.status.humanize %></span></td>
+              <td><%= comparison.result["confidence"].presence || "Unverified" %></td>
+              <td><time datetime="<%= comparison.compared_at.iso8601 %>"><%= comparison.compared_at.utc.strftime("%d %b %H:%M UTC") %></time></td>
+            </tr>
+          <% end %>
+        </tbody>
+      </table>
+    </div>
+  <% end %>
+</section>
