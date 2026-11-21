@@ -1,6 +1,9 @@
 module Api
   module V1
     class FindingsController < BaseController
+      rescue_from ActiveRecord::RecordNotFound do
+        render json: { error: "Finding not found" }, status: :not_found
+      end
       def index
         # Restrict the SQL relation by credential scopes before pagination.
         # A scoped read credential can list its own findings without explicitly
