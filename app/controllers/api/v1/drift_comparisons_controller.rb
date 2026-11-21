@@ -35,7 +35,13 @@ module Api
 
       def index
         repository = params.require(:repository)
-        return unless authorize_integration!(permission: "read", repository: repository)
+        # An environment-scoped credential may list only comparisons whose
+        # two environment scopes are permitted. Do not reject the listing before
+        # applying that per-comparison filter.
+        index_scope = current_credential.environment_scopes.first
+        return unless authorize_integration!(
+          permission: "read", repository: repository, environment: index_scope
+        )
 
         application = current_organization.applications.find_by!(
           repository_full_name: repository
