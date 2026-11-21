@@ -47,8 +47,11 @@
             { prompt: "Choose application" }, required: true %>
         </div>
         <div>
-          <%= f.label :environment_id, "Environment ID" %>
-          <%= f.number_field :environment_id, min: 1, required: true %>
+          <%= f.label :environment_id, "Environment" %>
+          <%= f.select :environment_id,
+            options_for_select(@environments.map { |env|
+              ["#{env.application.repository_full_name} / #{env.name}", env.id]
+            }), { prompt: "Choose environment" }, required: true %>
         </div>
         <div>
           <%= f.label :integration_credential_id, "Kubernetes observe credential" %>
