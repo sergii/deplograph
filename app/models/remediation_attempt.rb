@@ -59,7 +59,7 @@ class RemediationAttempt < ApplicationRecord
 
     uri = URI.parse(reference_url)
     return if uri.scheme == "https" && uri.host.present? &&
-              uri.userinfo.nil? && uri.fragment.nil?
+              uri.userinfo.nil? && uri.fragment.nil? && uri.query.nil?
 
     errors.add(:reference_url, "must be a valid HTTPS URL without embedded credentials")
   rescue URI::InvalidURIError
