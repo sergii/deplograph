@@ -220,6 +220,44 @@ class TrustedRuntimeAttestationsTest < ActionDispatch::IntegrationTest
     end
   end
 
+  test "owner can enroll a new public key but cannot bind it to a foreign tenant environment" do
+    login(@owner)
+    post runtime_attestors_path, params: {
+      application_id: @application.id,
+      environment_id: @production.id,
+      integration_credential_id: @credential.id,
+      name: "production-k8s-backup",
+      image_repository: "ghcr.io/acme/payments",
+      expected_workloads: '{"web":2,"worker":1}',
+      public_key_pem: OpenSSL::PKey.generate_key("ED25519").public_to_pem,
+      resolution_enabled: "0"
+    }
+    assert_redirected_to runtime_attestors_path
+    backup = @organization.runtime_attestors.find_by!(name: "production-k8s-backup")
+    assert_equal false, backup.resolution_enabled
+    assert_equal @owner.id, backup.approved_by_id
+
+    foreign_org = create_test_organization
+    foreign_app = foreign_org.applications.create!(
+      name: "Other", repository_full_name: "other/other"
+    )
+    foreign_env = foreign_app.environments.create!(
+      name: "production", kind: "production"
+    )
+    post runtime_attestors_path, params: {
+      application_id: @application.id,
+      environment_id: foreign_env.id,
+      integration_credential_id: @credential.id,
+      name: "injected",
+      image_repository: "ghcr.io/acme/payments",
+      expected_workloads: '{"web":2}',
+      public_key_pem: @key.public_to_pem,
+      resolution_enabled: "1"
+    }
+    assert_response :not_found
+    assert_equal 2, @organization.runtime_attestors.count
+  end
+
   test "owner can enroll and revoke but viewer cannot and private key input is refused" do
     login(@viewer)
     get runtime_attestors_path
