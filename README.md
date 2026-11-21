@@ -57,7 +57,7 @@ All API endpoints require a scoped organization credential (`Authorization: Bear
 - POST /api/v1/integration_events - ingest reports and runtime observations from approved providers.
 - GET /api/v1/environments?repository=acme/app - evidence-qualified per-environment inventory and findings.
 - POST /api/v1/github/webhooks - signed installation and repository grant events (GITHUB_WEBHOOK_SECRET).
-- POST /api/v1/repositories/inspect - read-only GitHub inspection for allowlisted files and repository metadata. Configure GITHUB_TOKEN for private repos.
+- POST /api/v1/repositories/inspect - public GitHub metadata/manifests only. Private access requires the future per-tenant GitHub App flow.
 - GET /up - liveness check.
 - GET / - organization-scoped dashboard, requires local password login.
 - GET/POST /login and DELETE /logout - login/logout.
@@ -77,7 +77,7 @@ The SBOM workflow runs on pushes to main or manually. It uses Syft via anchore/s
 
 The deployment-report workflow provides an explicit workflow_dispatch action to report an existing deployment for production, staging, sandbox, test or preview. This workflow does not deploy anything. In GitHub Settings > Environments, configure protection rules for sensitive environment names.
 
-The GitHub repository inspector uses read-only REST API requests and only fetches allowlisted build manifest paths. The newer asynchronous GitHub SBOM generate-report / fetch-report endpoints can be added later as an independent collector.
+The GitHub inspector currently uses unauthenticated public GitHub REST requests, with a safe manifest allowlist. It deliberately does not use a shared server-side GitHub token for caller-selected repositories. Private repository access and asynchronous SBOM reports require a tenant-bound GitHub App installation (next PR).
 
 ## Matching with OSV
 
@@ -141,7 +141,7 @@ for manual review, not granted to a newly created user.
 
 **Still out of scope:** GitHub OAuth and actual GitHub App installation token flow.
 Signed installation webhooks are recorded but are not yet joined to an organization.
-The server-side GitHub repository inspector continues to use a configured GitHub token.
+The tenant-facing repository inspector does NOT use a shared server-side GitHub token. It is public-repository-only until the GitHub App integration exists.
 Do not treat it as a complete per-installation GitHub permission boundary.
 Additional hardening before public deployment includes TLS, provider OIDC, rate limits,
 password recovery and scoped management UI.
