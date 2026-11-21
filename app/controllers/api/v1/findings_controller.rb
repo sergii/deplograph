@@ -2,8 +2,12 @@ module Api
   module V1
     class FindingsController < BaseController
       def index
+        # Restrict the SQL relation by credential scopes before pagination.
+        # A scoped read credential can list its own findings without explicitly
+        # repeating repository/environment filter parameters.
         return unless authorize_integration!(permission: "read",
-          repository: params[:repository], environment: params[:environment])
+          repository: params[:repository].presence || current_credential.repository_scopes.first,
+          environment: params[:environment].presence || current_credential.environment_scopes.first)
 
         findings = current_organization.drift_findings
           .includes(:application, :baseline_environment, :target_environment)
