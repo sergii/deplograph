@@ -66,9 +66,17 @@ module Github
         spdx.is_a?(Hash) && spdx["spdxVersion"].to_s.start_with?("SPDX-2.")
 
       organization = installation.organization
-      application = organization.applications.find_or_create_by!(
+      application = organization.applications.find_by(
+        github_repository_id: grant.github_repository_id
+      ) || organization.applications.find_or_initialize_by(
         repository_full_name: grant.full_name
-      ) { |app| app.name = grant.full_name.split("/").last }
+      )
+      application.assign_attributes(
+        github_repository_id: grant.github_repository_id,
+        repository_full_name: grant.full_name,
+        name: grant.full_name.split("/").last
+      )
+      application.save!
 
       # GitHub dependency-graph exports are not build attestations. Do not claim
       # their contents correspond to a verified commit or deployed OCI image.
