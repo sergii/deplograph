@@ -50,6 +50,7 @@ class GithubWebhookTest < ActionDispatch::IntegrationTest
     post "/api/v1/github/webhooks", params: json,
       headers: { "CONTENT_TYPE" => "application/json",
                  "X-GitHub-Event" => event,
+                 "X-GitHub-Delivery" => SecureRandom.uuid,
                  "X-Hub-Signature-256" => "sha256=#{signature}" }
     assert_response :accepted, response.body
   end
