@@ -115,7 +115,8 @@
               <%= link_to "Comparison ##{check.drift_comparison_id}", drift_comparison_path(check.drift_comparison) %> ·
               <%= check.trigger.humanize %> ·
               <%= check.evidence_quality.humanize %> evidence ·
-              Not independently verified
+              <%= @resolutions.any? { |resolution| resolution.finding_verification_check_id == check.id } ?
+                "Linked signed control-plane evidence" : "Awaiting signed runtime verification" %>
             </p>
           </div>
         <% end %>
