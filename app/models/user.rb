@@ -6,6 +6,8 @@ class User < ApplicationRecord
 
   before_validation :normalize_email
 
+  validates :password, length: { minimum: 12 }, if: -> { password.present? }
+
   validates :email, presence: true, uniqueness: { case_sensitive: false },
     format: { with: URI::MailTo::EMAIL_REGEXP }
 
