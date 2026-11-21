@@ -60,13 +60,13 @@ class TenantAccessTest < ActionDispatch::IntegrationTest
     assert_response :forbidden
     assert_equal 0, DeploymentEvent.count
 
-    body["environment"] = "staging"
-    body["source"] = "kamal"
+    body[:environment] = "staging"
+    body[:source] = "kamal"
     post "/api/v1/integration_events", params: JSON.generate(body),
       headers: bearer_headers(limited)
     assert_response :forbidden
 
-    body["source"] = "github_actions"
+    body[:source] = "github_actions"
     post "/api/v1/integration_events", params: JSON.generate(body),
       headers: bearer_headers(limited)
     assert_response :accepted
