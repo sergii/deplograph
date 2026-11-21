@@ -1,0 +1,30 @@
+name: Attestor Kubernetes smoke
+
+on:
+  pull_request:
+    paths:
+      - "collectors/**"
+      - ".github/workflows/attestor-kind-smoke.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  kind-smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - name: Create isolated Kubernetes cluster
+        uses: helm/kind-action@v1.15.2
+        with:
+          version: v0.33.0
+          cluster_name: deplograph-attestor
+      - name: Build and load the minimal attestor image
+        run: |
+          docker build --pull -f collectors/Dockerfile -t deplograph-attestor:smoke collectors
+          docker run --rm --entrypoint ruby deplograph-attestor:smoke -r openssl -e 'raise "Ed25519 unavailable" unless OpenSSL::PKey.generate_key("ED25519").oid == "ED25519"'
+          kind load docker-image deplograph-attestor:smoke --name deplograph-attestor
+      - name: Verify actual control-plane observations and fail-closed paths
+        run: bash collectors/smoke/kind_attestor_smoke.sh
