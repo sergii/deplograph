@@ -1,0 +1,84 @@
+<div class="topline">
+  <div>
+    <div class="eyebrow">Runtime trust</div>
+    <h1>Kubernetes attestors</h1>
+    <p class="muted">Enrollment requires owner/admin approval, a scoped observer token and a pinned workload coverage contract.</p>
+  </div>
+  <%= link_to "Findings", findings_path, class: "btn" %>
+</div>
+<section class="panel" style="margin-bottom:20px">
+  <h2>Registered control-plane observers</h2>
+  <% if @attestors.empty? %>
+    <div class="empty">No attestors configured. Existing runtime observations remain partial.</div>
+  <% else %>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>Name</th><th>Environment</th><th>Workload coverage</th><th>Resolution</th><th>State</th><th>Approved by</th><th></th></tr></thead>
+        <tbody>
+          <% @attestors.each do |attestor| %>
+            <tr>
+              <td><strong><%= attestor.name %></strong><div class="muted small"><%= attestor.image_repository %></div></td>
+              <td><%= attestor.application.repository_full_name %><div class="muted small"><%= attestor.environment.name %></div></td>
+              <td><code><%= attestor.expected_workloads.to_json %></code></td>
+              <td><span class="pill"><%= attestor.resolution_enabled? ? "Approved" : "Observe only" %></span></td>
+              <td><span class="pill pill-<%= attestor.active? ? "same" : "different" %>"><%= attestor.active? ? "Active" : "Revoked" %></span></td>
+              <td><%= attestor.approved_by.email %></td>
+              <td>
+                <% if can_approve_attestors? && attestor.revoked_at.nil? %>
+                  <%= button_to "Revoke", revoke_runtime_attestor_path(attestor), method: :post, class: "btn" %>
+                <% end %>
+              </td>
+            </tr>
+          <% end %>
+        </tbody>
+      </table>
+    </div>
+  <% end %>
+</section>
+<% if can_approve_attestors? %>
+  <section class="panel">
+    <h2>Enroll a control-plane observer</h2>
+    <p class="muted small">Only enroll an observer with reviewed read-only Kubernetes RBAC and a protected Ed25519 signing key. Explicit resolution approval allows automatic resolution of artifact drift only, never CVEs or ENV issues.</p>
+    <%= form_with url: runtime_attestors_path, method: :post, local: true do |f| %>
+      <div class="stack">
+        <div>
+          <%= f.label :application_id, "Application" %>
+          <%= f.collection_select :application_id, @applications, :id, :repository_full_name,
+            { prompt: "Choose application" }, required: true %>
+        </div>
+        <div>
+          <%= f.label :environment_id, "Environment ID" %>
+          <%= f.number_field :environment_id, min: 1, required: true %>
+        </div>
+        <div>
+          <%= f.label :integration_credential_id, "Kubernetes observe credential" %>
+          <%= f.collection_select :integration_credential_id, @credentials, :id, :name,
+            { prompt: "Choose credential" }, required: true %>
+        </div>
+        <div>
+          <%= f.label :name, "Attestor name" %>
+          <%= f.text_field :name, required: true, placeholder: "prod-k8s-control-plane" %>
+        </div>
+        <div>
+          <%= f.label :image_repository, "OCI image repository" %>
+          <%= f.text_field :image_repository, required: true, placeholder: "ghcr.io/acme/payments" %>
+        </div>
+        <div>
+          <%= f.label :expected_workloads, "Approved replicas per workload (JSON)" %>
+          <%= f.text_area :expected_workloads, required: true, placeholder: '{"web":2,"worker":1}' %>
+          <p class="muted small">Review and update this contract whenever deployments, workload names or replica counts change.</p>
+        </div>
+        <div>
+          <%= f.label :public_key_pem, "Ed25519 public key PEM" %>
+          <%= f.text_area :public_key_pem, required: true, placeholder: "-----BEGIN PUBLIC KEY-----" %>
+          <p class="muted small">Never paste a private signing key here.</p>
+        </div>
+        <div>
+          <%= f.check_box :resolution_enabled %>
+          <%= f.label :resolution_enabled, "Explicitly allow verified artifact-drift resolution" %>
+        </div>
+        <%= f.submit "Register attestor", class: "btn btn-primary" %>
+      </div>
+    <% end %>
+  </section>
+<% end %>
