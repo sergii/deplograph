@@ -2,12 +2,9 @@ require "test_helper"
 
 class IngestionTest < ActionDispatch::IntegrationTest
   setup do
-    @old_token = ENV["DEPLOGRAPH_INGEST_TOKEN"]
-    ENV["DEPLOGRAPH_INGEST_TOKEN"] = "test-ingestion-token"
-  end
-
-  teardown do
-    ENV["DEPLOGRAPH_INGEST_TOKEN"] = @old_token
+    @organization = create_test_organization
+    @api_token = issue_test_token(organization: @organization)
+    @github_token = issue_test_token(organization: @organization, provider: "github_actions")
   end
 
   test "rejects unauthenticated ingestion" do
@@ -30,7 +27,7 @@ class IngestionTest < ActionDispatch::IntegrationTest
   test "records CI report without falsely claiming runtime observation" do
     body = JSON.parse(File.read(Rails.root.join("examples/sample_deployment.json")))
     2.times do
-      post "/api/v1/deployments", params: JSON.generate(body), headers: auth_headers
+      post "/api/v1/deployments", params: JSON.generate(body), headers: bearer_headers(@github_token)
       assert_response :created
       assert_equal "reported", response.parsed_body.fetch("evidence")
     end
@@ -52,7 +49,6 @@ class IngestionTest < ActionDispatch::IntegrationTest
   private
 
   def auth_headers
-    { "CONTENT_TYPE" => "application/json",
-      "Authorization" => "Bearer test-ingestion-token" }
+    bearer_headers(@api_token)
   end
 end
