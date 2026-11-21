@@ -102,6 +102,15 @@ module Findings
         if comparison.mode == "reported"
           identifier = deployment.artifact.image_digest.presence ||
             deployment.artifact.identifier
+          if finding.category == "artifact_drift" &&
+             !Array(dimension["target"]).include?(identifier)
+            return false
+          end
+          if finding.category == "release_drift" &&
+             (deployment.release.nil? ||
+              !Array(dimension["target"]).include?(deployment.release.name))
+            return false
+          end
           return Array(comparison.result.dig("target", "workloads")).any? do |entry|
             entry.is_a?(Hash) &&
               entry["event_id"].present? && entry["event_id"] == deployment.external_id &&
@@ -111,7 +120,7 @@ module Findings
         end
 
         if %w[configuration_names configuration_fingerprints].include?(comparison.mode)
-          snapshot = snapshot_from_dimension(comparison.mode, dimension)
+          snapshot = snapshot_from_dimension(dimension)
           return snapshot.present? &&
             snapshot.environment_id == finding.target_environment_id &&
             snapshot.collected_at >= deployment.deployed_at &&
@@ -140,12 +149,8 @@ module Findings
       end
     end
 
-    def snapshot_from_dimension(mode, dimension)
-      id = if mode == "configuration_names"
-        dimension.dig("target", "snapshot_id")
-      else
-        dimension.dig("target", "snapshot_id")
-      end
+    def snapshot_from_dimension(dimension)
+      id = dimension.dig("target", "snapshot_id")
       ConfigurationSnapshot.find_by(id: id) if id
     end
 
