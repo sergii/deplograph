@@ -91,6 +91,7 @@ class ConfigurationFingerprintsTest < ActionDispatch::IntegrationTest
   end
 
   test "missing and partial fingerprint uploads cannot produce a clean result" do
+    @values["production"]["DATABASE_URL"] = @values["staging"]["DATABASE_URL"]
     ids = create_both_snapshots
     post_fingerprints(ids.fetch("staging"), @values.fetch("staging"))
     compare
@@ -104,6 +105,20 @@ class ConfigurationFingerprintsTest < ActionDispatch::IntegrationTest
     assert_equal "partial", dimension.fetch("status")
     assert_includes dimension.fetch("unresolved_keys"), "API_KEY"
     assert_equal "partial", dimension.fetch("confidence")
+  end
+
+  test "a known value-policy violation remains visible even when other fingerprints are missing" do
+    ids = create_both_snapshots
+    post_fingerprints(ids.fetch("staging"), @values.fetch("staging"))
+    post_fingerprints(ids.fetch("production"), @values.fetch("production").slice("DATABASE_URL"))
+
+    compare
+    assert_response :created
+    evidence = response.parsed_body.dig("result", "dimensions", "environment_value_fingerprints")
+    assert_equal "different", evidence.fetch("status")
+    assert_equal "partial", evidence.fetch("confidence")
+    assert_equal ["DATABASE_URL"], evidence.fetch("policy_violations")
+    assert_includes evidence.fetch("unresolved_keys"), "API_KEY"
   end
 
   test "fingerprint upload validates names, digest syntax and conflicts without storing values" do
