@@ -36,14 +36,27 @@ module Findings
           finding.with_lock do
             next if comparison.compared_at < finding.last_seen_at
 
-            finding.update!(
+            previous_status = finding.status
+            reopened = previous_status == "resolved" && finding.resolved_at.present? &&
+              comparison.compared_at > finding.resolved_at
+            attrs = {
               latest_comparison: comparison,
               last_seen_at: comparison.compared_at,
               evidence_quality: candidate.evidence_quality
-            )
-            finding.drift_finding_events.create!(
-              drift_comparison: comparison, action: "observed"
-            )
+            }
+            attrs.merge!(status: "open", resolved_at: nil) if reopened
+            finding.update!(attrs)
+            if reopened
+              finding.drift_finding_events.create!(
+                drift_comparison: comparison, action: "reopened",
+                from_status: "resolved", to_status: "open",
+                note: "The same issue reappeared in later comparison evidence"
+              )
+            else
+              finding.drift_finding_events.create!(
+                drift_comparison: comparison, action: "observed"
+              )
+            end
           end
         end
       end
