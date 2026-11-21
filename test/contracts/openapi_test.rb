@@ -16,7 +16,7 @@ class OpenapiTest < ActiveSupport::TestCase
   test "OpenAPI describes implemented routes and response statuses" do
     spec = YAML.safe_load_file(Rails.root.join("public/openapi.yaml"))
     assert_equal "3.1.0", spec.fetch("openapi")
-    assert_equal "http", spec.dig("components", "securitySchemes", "IngestionToken", "type")
+    assert_equal "http", spec.dig("components", "securitySchemes", "IntegrationCredential", "type")
     EXPECTED.each do |path, methods|
       methods.each do |method, status|
         operation = spec.fetch("paths").fetch(path).fetch(method)
