@@ -413,6 +413,59 @@ paths:
         '403': { description: Missing manage permission }
         '404': { description: Application or environment missing }
         '422': { description: Invalid rule or scope }
+  /api/v1/findings:
+    get:
+      operationId: listDriftFindings
+      summary: List evidence-qualified operational findings
+      description: |
+        Read-only endpoint. Scoped to organization, allowed repositories and
+        BOTH comparison environments before pagination. Does not expose HMAC
+        digests, raw ENV values or cross-tenant finding identifiers.
+      parameters:
+        - name: repository
+          in: query
+          schema: { type: string }
+        - name: environment
+          in: query
+          schema: { type: string }
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum: [open, acknowledged, investigating, verification_pending, resolved, dismissed]
+      responses:
+        '200':
+          description: Scoped findings register
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [findings]
+                properties:
+                  findings:
+                    type: array
+                    items: { $ref: '#/components/schemas/DriftFindingResponse' }
+        '401': { description: Missing or expired credential }
+        '403': { description: Credential scope denied }
+        '422': { description: Unsupported status filter }
+  /api/v1/findings/{id}:
+    get:
+      operationId: getDriftFinding
+      summary: Inspect one finding without leaking raw evidence
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer }
+      responses:
+        '200':
+          description: Finding metadata and latest evidence reference
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/DriftFindingResponse' }
+        '401': { description: Missing or expired credential }
+        '403': { description: One or both environment scopes denied }
+        '404': { description: Finding does not belong to the organization }
   /api/v1/releases:
     post:
       operationId: registerRelease
@@ -613,6 +666,28 @@ components:
             baseline: { type: object }
             target: { type: object }
             dimensions: { type: object }
+    DriftFindingResponse:
+      type: object
+      required: [id, repository, baseline_environment, target_environment, category, subject, title, status, severity, priority, evidence_quality, latest_comparison_id, first_seen_at, last_seen_at, assigned_to_id, next_action]
+      properties:
+        id: { type: integer }
+        repository: { type: string }
+        baseline_environment: { type: string }
+        target_environment: { type: string }
+        category: { type: string }
+        subject: { type: string }
+        title: { type: string }
+        status:
+          type: string
+          enum: [open, acknowledged, investigating, verification_pending, resolved, dismissed]
+        severity: { type: string, enum: [unknown, low, medium, high, critical] }
+        priority: { type: string, enum: [p1, p2, p3] }
+        evidence_quality: { type: string, enum: [reported_only, partial, stale, unknown, verified] }
+        latest_comparison_id: { type: integer }
+        first_seen_at: { type: string, format: date-time }
+        last_seen_at: { type: string, format: date-time }
+        assigned_to_id: { type: [integer, 'null'] }
+        next_action: { type: [string, 'null'] }
     InventoryRequest:
       type: object
       required: [repository, artifact_identifier, format, sbom]
