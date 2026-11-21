@@ -4,6 +4,7 @@ require "yaml"
 class OpenapiTest < ActiveSupport::TestCase
   EXPECTED = {
     "/api/v1/inventories" => { "post" => "201" },
+    "/api/v1/inventories/lockfile" => { "post" => "201" },
     "/api/v1/releases" => { "get" => "200", "post" => "201" },
     "/api/v1/deployments" => { "post" => "201" },
     "/api/v1/integration_events" => { "post" => "202" },

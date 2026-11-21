@@ -18,6 +18,7 @@ Rails.application.routes.draw do
   namespace :api do
     namespace :v1 do
       post "inventories", to: "inventories#create"
+      post "inventories/lockfile", to: "inventories#import_lockfile"
       post "deployments", to: "deployments#create"
       post "environment_events", to: "environment_events#create"
       post "repositories/inspect", to: "repositories#inspect"

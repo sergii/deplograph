@@ -199,3 +199,43 @@ rate-limit backoff, and add credential-scoped job observability before productio
 Only explicitly allowed GitHub download hosts are supported: unexpected redirects
 fail closed. GitHub OAuth here verifies the installation, but user sign-in remains
 the local Deplograph password/session flow.
+
+
+## Ruby lockfile inventory & advisory history (stacked PR #4)
+
+Deplograph can now parse a Ruby \`Gemfile.lock\` into CycloneDX components and
+dependency edges. It is safe to test without registering a GitHub App:
+
+    bin/rails test test/services/inventory/gemfile_lock_test.rb
+
+To import a lockfile from an API client with a \`report\` credential:
+
+    jq -n --arg repository "acme/ruby-demo" --rawfile lockfile Gemfile.lock \
+      '{repository: $repository, lockfile: $lockfile}' |
+      curl -H "Authorization: Bearer $DEPLOGRAPH_API_TOKEN" \
+           -H "Content-Type: application/json" \
+           --data-binary @- http://localhost:3000/api/v1/inventories/lockfile
+
+The importer records a content-addressed artifact and immutable inventory
+snapshot. GitHub App repository sync independently checks \`Gemfile.lock\`
+with a repository-scoped installation token. If that manifest is absent, the
+GitHub SPDX export continues separately.
+
+**Coverage is partial.** A lockfile describes resolved Ruby dependencies
+but says nothing about OS packages, container layers, or what is currently
+running. The parser does not claim build provenance or an exact deployed
+commit. A missing vulnerability match does not mean "safe" when scanning
+is disabled, incomplete, stale or failed.
+
+Scan history records trigger, provider, start/completion timestamps,
+match counts and errors. When \`OSV_ENABLED=true\`, use this command from
+a trusted scheduler to enqueue due scans (24-hour default, 200 per invocation):
+
+    bin/rails inventory:rescan_due
+
+This allows newly published advisories to affect **unchanged inventory**.
+The repository does not configure a recurring production scheduler yet:
+you must schedule this task and run a durable background queue before
+production. A scan failure retains the last successful OSV evidence but
+marks the current scan as failed, never as "no vulnerabilities".
+OSV/CVE/GHSA alias normalization and broader advisory feeds remain future work.
