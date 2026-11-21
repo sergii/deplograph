@@ -61,6 +61,11 @@ class ConfigurationFingerprintsTest < ActionDispatch::IntegrationTest
     compare
     assert_response :created
     assert_equal "same", response.parsed_body.fetch("status")
+    compliant = response.parsed_body.dig("result", "dimensions", "environment_value_fingerprints")
+    assert_equal "policy_compliance", compliant.fetch("status_semantics")
+    assert_equal true, compliant.fetch("policy_compliant")
+    assert_includes compliant.fetch("known_value_differences"), "DATABASE_URL"
+    assert_includes compliant.fetch("known_value_differences"), "API_KEY"
     assert_equal 2, DriftComparison.where(mode: "configuration_fingerprints").count
     assert_equal 4, ConfigurationPolicyChange.count
   end
@@ -88,6 +93,20 @@ class ConfigurationFingerprintsTest < ActionDispatch::IntegrationTest
     assert_equal false, dimension.fetch("values_compared")
     assert_equal 2, ConfigurationFingerprintBatch.count
     assert_equal 2, ids.size
+  end
+
+  test "an explicit mandatory key missing from both complete snapshots is a violation" do
+    create_both_snapshots_and_fingerprints
+    put_policy(name: "REQUIRED_NEW_SECRET", rule: "must_match")
+    compare
+    assert_response :created
+
+    drift = response.parsed_body.dig("result", "dimensions", "environment_value_fingerprints")
+    assert_equal "different", drift.fetch("status")
+    assert_includes drift.fetch("policy_violations"), "REQUIRED_NEW_SECRET"
+    entry = drift.fetch("comparisons").find { |item| item.fetch("name") == "REQUIRED_NEW_SECRET" }
+    assert_equal "absent_both", entry.fetch("presence")
+    assert_equal "violation", entry.fetch("evaluation")
   end
 
   test "missing and partial fingerprint uploads cannot produce a clean result" do
