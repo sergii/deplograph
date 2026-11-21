@@ -83,7 +83,9 @@ module Drift
       else
         environment.deployment_observations
           .order(observed_at: :desc, id: :desc).to_a.uniq(&:workload).map do |observation|
-          { workload: observation.workload, artifact: observation.artifact,
+          { workload: observation.metadata["logical_workload"].presence || observation.workload,
+            instance_id: observation.metadata["instance_id"],
+            artifact: observation.artifact,
             identifier: observation.image_digest,
             snapshot: latest_snapshot(observation.artifact),
             release: nil, event_id: observation.event_id, at: observation.observed_at }
@@ -110,6 +112,7 @@ module Drift
           snapshot = entry[:snapshot]
           {
             "name" => entry.fetch(:workload),
+            "instance_id" => entry[:instance_id],
             "artifact_identifier" => entry.fetch(:identifier),
             "event_id" => entry[:event_id],
             "recorded_at" => entry[:at],
@@ -135,8 +138,8 @@ module Drift
     end
 
     def artifact_diff(before, after)
-      baseline = before[:entries].map { |entry| entry[:identifier] }.compact.sort
-      target = after[:entries].map { |entry| entry[:identifier] }.compact.sort
+      baseline = before[:entries].map { |entry| entry[:identifier] }.compact.uniq.sort
+      target = after[:entries].map { |entry| entry[:identifier] }.compact.uniq.sort
       return unknown_dimension("Artifact identity missing") if baseline.empty? || target.empty?
 
       { "status" => baseline == target ? "same" : "different",
@@ -231,8 +234,8 @@ module Drift
     end
 
     def workload_diff(before, after)
-      old_names = before[:entries].map { |entry| entry[:workload] }.sort
-      new_names = after[:entries].map { |entry| entry[:workload] }.sort
+      old_names = before[:entries].map { |entry| entry[:workload] }.uniq.sort
+      new_names = after[:entries].map { |entry| entry[:workload] }.uniq.sort
       # An unobserved workload is not proof that it is absent.
       { "status" => "partial",
         "known_relation" => old_names == new_names ? "same" : "different",
