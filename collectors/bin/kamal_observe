@@ -1,0 +1,28 @@
+#!/usr/bin/env ruby
+# frozen_string_literal: true
+
+require_relative "../lib/deplograph/kamal_collector"
+
+begin
+  require "json"
+
+  collector = Deplograph::RuntimeCollectors::KamalCollector.new(
+    service: ENV.fetch("KAMAL_SERVICE"),
+    image_repository: ENV.fetch("KAMAL_IMAGE_REPOSITORY"),
+    destination: ENV["KAMAL_DESTINATION"],
+    host_id: ENV.fetch("KAMAL_HOST_ID", Socket.gethostname),
+    docker: Deplograph::RuntimeCollectors::DockerApi.new
+  )
+  client = Deplograph::RuntimeCollectors::Emitter.new(
+    url: ENV.fetch("DEPLOGRAPH_URL"),
+    token: ENV.fetch("DEPLOGRAPH_TOKEN"),
+    repository: ENV.fetch("DEPLOGRAPH_REPOSITORY"),
+    environment: ENV.fetch("DEPLOGRAPH_ENVIRONMENT")
+  )
+  events = collector.collect
+  events.each { |event| client.send_event(event) }
+  puts JSON.generate({ submitted: events.size, source: "kamal_agent", coverage: "partial" })
+rescue KeyError, Deplograph::RuntimeCollectors::Error => error
+  warn "Runtime collection failed: #{error.class}: #{error.message}"
+  exit 1
+end
