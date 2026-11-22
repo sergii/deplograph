@@ -14,8 +14,14 @@
             <%= grant.full_name %>
             <%= grant.enabled? ? "allowed" : "revoked" %>
             <% if grant.enabled? %>
-              <%= button_to "Import GitHub SBOM", import_github_repository_path(installation.installation_id, grant.github_repository_id), method: :post %>
-              <small>Last sync: <%= grant.sbom_sync_status %></small>
+              <%= button_to "Queue repository inventory", import_github_repository_path(installation.installation_id, grant.github_repository_id), method: :post %>
+              <small>Import status: <%= grant.sbom_sync_status %></small>
+              <% if grant.last_import_error.present? %>
+                <small> | Last issue: <%= grant.last_import_error %></small>
+              <% end %>
+              <% if grant.last_imported_at? %>
+                <small> | Last imported: <%= grant.last_imported_at.utc.iso8601 %></small>
+              <% end %>
             <% end %>
           </li>
         <% end %>
