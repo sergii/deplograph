@@ -1,4 +1,6 @@
 Rails.application.configure do
+  raise "QUEUE_DATABASE_URL must be configured for the durable worker" if
+    ENV["QUEUE_DATABASE_URL"].blank?
   config.enable_reloading = false
   config.eager_load = true
   config.consider_all_requests_local = false
