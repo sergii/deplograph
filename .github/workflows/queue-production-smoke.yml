@@ -53,8 +53,14 @@ jobs:
           bin/rails runner 'Vulnerabilities::ScanDueSnapshotsJob.perform_later'
           bundle exec ruby bin/jobs start > /tmp/deplograph-worker.log 2>&1 &
           worker_pid=$!
-          trap 'status=$?; if [[ "$status" != "0" ]]; then tail -n 100 /tmp/deplograph-worker.log || true; fi; kill "$worker_pid" 2>/dev/null || true' EXIT
-          bin/rails runner '
+          trap 'kill "$worker_pid" 2>/dev/null || true' EXIT
+          sleep 3
+          if ! kill -0 "$worker_pid" 2>/dev/null; then
+            echo "Solid Queue worker exited before claiming the job."
+            tail -n 100 /tmp/deplograph-worker.log || true
+            exit 1
+          fi
+          if ! bin/rails runner '
             raise "Expected production to use Solid Queue" unless
               ActiveJob::Base.queue_adapter.class.name.include?("SolidQueue")
             30.times do
@@ -67,5 +73,16 @@ jobs:
               end
               sleep 1
             end
+            warn "Solid Queue diagnostic: #{{
+              jobs: SolidQueue::Job.where(
+                class_name: "Vulnerabilities::ScanDueSnapshotsJob"
+              ).pluck(:id, :finished_at),
+              ready: SolidQueue::ReadyExecution.count,
+              failed: SolidQueue::FailedExecution.count,
+              processes: SolidQueue::Process.count
+            }.inspect}"
             raise "Worker did not execute persisted job"
-          '
+          '; then
+            tail -n 100 /tmp/deplograph-worker.log || true
+            exit 1
+          fi
