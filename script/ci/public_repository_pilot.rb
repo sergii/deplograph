@@ -42,7 +42,9 @@ raise "A source lockfile is not a runtime assertion" unless snapshot.artifact.ki
 raise "Scan must start as not_scanned" unless snapshot.match_status == "not_scanned"
 
 # Query the real OSV API. The CI test suite normally uses WebMock instead.
-Vulnerabilities::MatchSnapshotJob.perform_now(snapshot.id, trigger: "pilot_live_osv")
+# Invoke the job's domain operation directly in Rails runner: this smoke
+# exercises real matching and persistence, not Active Job instrumentation.
+Vulnerabilities::MatchSnapshotJob.new.perform(snapshot.id, trigger: "pilot_live_osv")
 snapshot.reload
 raise "OSV scan did not complete" unless snapshot.match_status == "completed"
 scan = snapshot.vulnerability_scan_runs.order(:id).last
