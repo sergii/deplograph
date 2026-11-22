@@ -22,7 +22,7 @@ module Github
         render json: { status: "queued", repository: grant.full_name }, status: :accepted
       else
         redirect_to github_installations_path,
-          notice: "Repository inventory queued. Status updates appear here automatically."
+          notice: "Repository inventory queued. Refresh this page to check import status."
       end
     end
 
