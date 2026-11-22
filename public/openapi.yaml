@@ -37,6 +37,40 @@ paths:
         '403': { description: Credential scope or permission denied }
         '409': { description: Artifact identity conflict }
         '422': { description: Invalid import }
+  /api/v1/inventories/lockfile:
+    post:
+      operationId: importRubyLockfile
+      summary: Import a Ruby Gemfile.lock as partial CycloneDX inventory
+      description: Only package names, resolved versions and dependency relationships are ingested. This is not a verified build or runtime inventory.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [repository, lockfile]
+              properties:
+                repository: { type: string }
+                lockfile: { type: string }
+      responses:
+        '201':
+          description: Lockfile inventory imported
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [inventory_snapshot_id, artifact_id, sha256, component_count, dependency_count, coverage_status, match_status]
+                properties:
+                  inventory_snapshot_id: { type: integer }
+                  artifact_id: { type: integer }
+                  sha256: { type: string }
+                  component_count: { type: integer }
+                  dependency_count: { type: integer }
+                  coverage_status: { type: string, enum: [partial] }
+                  match_status: { type: string }
+        '401': { description: Unauthorized }
+        '403': { description: Credential scope or permission denied }
+        '422': { description: Invalid or oversized lockfile }
   /api/v1/releases:
     post:
       operationId: registerRelease

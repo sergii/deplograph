@@ -8,7 +8,8 @@ module Inventory
     MAX_COMPONENTS = 50_000
 
     def call(application:, artifact_identifier:, document:, format:, kind: "source",
-             source: "api", image_digest: nil, commit_sha: nil)
+             source: "api", image_digest: nil, commit_sha: nil,
+             coverage_status: "partial", manifest_type: nil)
       raise InvalidDocument, "SBOM must be a JSON object" unless document.is_a?(Hash)
 
       components, relationships = extract(document, format)
@@ -25,7 +26,8 @@ module Inventory
         snapshot = artifact.inventory_snapshots.find_or_initialize_by(sha256: digest)
         next snapshot if snapshot.persisted?
 
-        snapshot.assign_attributes(format: format, raw_document: document, source: source)
+        snapshot.assign_attributes(format: format, raw_document: document, source: source,
+          coverage_status: coverage_status, manifest_type: manifest_type)
         snapshot.save!
 
         references = {}

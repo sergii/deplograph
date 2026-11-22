@@ -13,6 +13,23 @@ module Github
       )
       return unless grant
 
+      if attempt.zero?
+        begin
+          lockfile_snapshot = LockfileCollector.new.call(grant: grant)
+          if lockfile_snapshot && ENV["OSV_ENABLED"] == "true" &&
+             lockfile_snapshot.match_status == "not_scanned"
+            Vulnerabilities::MatchSnapshotJob.perform_later(
+              lockfile_snapshot.id, trigger: "new_inventory"
+            )
+          end
+        rescue ApiClient::ApiError, HttpClient::Error,
+               LockfileCollector::PermissionError,
+               Inventory::GemfileLock::InvalidLockfile => error
+          # A missing/invalid lockfile must not block GitHub SPDX collection.
+          Rails.logger.warn("GitHub lockfile collection failed for repository ID #{repository_id}: #{error.class}")
+        end
+      end
+
       result = SbomImporter.new.call(grant: grant)
       if result.status == "pending"
         if attempt < MAX_POLL_ATTEMPTS
