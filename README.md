@@ -57,7 +57,7 @@ All API endpoints require a scoped organization credential (`Authorization: Bear
 - POST /api/v1/integration_events - ingest reports and runtime observations from approved providers.
 - GET /api/v1/environments?repository=acme/app - evidence-qualified per-environment inventory and findings.
 - POST /api/v1/github/webhooks - signed installation and repository grant events (GITHUB_WEBHOOK_SECRET).
-- POST /api/v1/repositories/inspect - public GitHub metadata/manifests only. Private access requires the future per-tenant GitHub App flow.
+- POST /api/v1/repositories/inspect - public GitHub metadata/manifests, or private repositories granted by a verified tenant-bound GitHub App installation.
 - GET /up - liveness check.
 - GET / - organization-scoped dashboard, requires local password login.
 - GET/POST /login and DELETE /logout - login/logout.
@@ -77,7 +77,7 @@ The SBOM workflow runs on pushes to main or manually. It uses Syft via anchore/s
 
 The deployment-report workflow provides an explicit workflow_dispatch action to report an existing deployment for production, staging, sandbox, test or preview. This workflow does not deploy anything. In GitHub Settings > Environments, configure protection rules for sensitive environment names.
 
-The GitHub inspector currently uses unauthenticated public GitHub REST requests, with a safe manifest allowlist. It deliberately does not use a shared server-side GitHub token for caller-selected repositories. Private repository access and asynchronous SBOM reports require a tenant-bound GitHub App installation (next PR).
+The GitHub inspector uses anonymous REST requests for public repositories, or a one-repository-scoped GitHub App installation token for a verified tenant grant. A shared server-side GitHub token is never forwarded to a caller-selected repository. GitHub SBOM reports are processed using GitHub's asynchronous export API.
 
 ## Matching with OSV
 
@@ -88,10 +88,10 @@ Matching is not exploitability analysis. No claim is made that a component is ex
 ## Boundaries / follow-up work
 
 - This MVP does not independently verify running images on Kubernetes/Kamal/AWS.
-- No hosted SaaS instance, OAuth, billing or external secrets store yet.
+- No hosted SaaS instance, GitHub sign-in, billing or external secrets store yet.
 - The async job backend is not durable across process restarts. Replace it with Solid Queue and recurring retry policies before production.
 - Supports CycloneDX component/dependency basics and SPDX 2.x PURLs. SPDX 3.x and full schema validation are future work.
-- Local user sign-in and API tenant scoping are implemented. GitHub App installation onboarding and short-lived installation tokens remain next.
+- Local password sign-in and tenant-scoped API are implemented. GitHub App installation onboarding and short-lived repository-scoped tokens are available after configuring GitHub App credentials.
 - No production-grade OCI image scanner or real cluster credential flow yet.
 - No actual Slack notifications are sent. Slack can be integrated after alert rules and tenant isolation.
 - Do not publicly deploy without TLS, rate limits, onboarding/SSO, password reset and session security review.
@@ -139,12 +139,63 @@ Creation and revocation are recorded in IntegrationAuditEvent.
 Existing application records are migrated into a locked legacy-unclaimed organization
 for manual review, not granted to a newly created user.
 
-**Still out of scope:** GitHub OAuth and actual GitHub App installation token flow.
-Signed installation webhooks are recorded but are not yet joined to an organization.
-The tenant-facing repository inspector does NOT use a shared server-side GitHub token. It is public-repository-only until the GitHub App integration exists.
-Do not treat it as a complete per-installation GitHub permission boundary.
+**Still out of scope:** GitHub account sign-in/SSO and persistent user-side GitHub access. The GitHub OAuth flow in PR #3 is only used to prove installation ownership and associate an installation with an existing Deplograph organization. Short-lived installation tokens authorize per-repository reads. Without configured GitHub App credentials, only public repository inspection is available.
 Additional hardening before public deployment includes TLS, provider OIDC, rate limits,
 password recovery and scoped management UI.
 
 A matching runtime image is partial evidence, not full deployment verification.
 Immutable artifacts and OSV source preservation remain enforced.
+
+
+## GitHub App connection (stacked PR #3)
+
+This is an opt-in adapter. It is not enabled until a GitHub App has been registered
+and its credentials configured. To register your own App, configure in GitHub:
+
+- Setup URL: https://YOUR-HOST/github/installations/setup
+- OAuth callback URL: https://YOUR-HOST/github/installations/callback
+- Webhook URL: https://YOUR-HOST/api/v1/github/webhooks
+- App repository permissions: **Contents: read**, **Metadata: read**
+- Webhook events: installation, installation_repositories, push
+- Keep "Request user authorization (OAuth) during installation" disabled when using
+  the separate setup URL flow. Deplograph starts the OAuth authorization after setup.
+
+Set GITHUB_APP_ID, GITHUB_APP_CLIENT_ID, GITHUB_APP_CLIENT_SECRET,
+GITHUB_APP_PRIVATE_KEY, GITHUB_APP_CALLBACK_URL, GITHUB_APP_SLUG and
+GITHUB_WEBHOOK_SECRET via your deployment secrets manager. The private key may be
+a PEM value with literal newline characters or escaped newlines. Never commit
+credentials to this repository.
+
+1. Log in to Deplograph with an owner/admin account and open /github/installations.
+2. Install the GitHub App, selecting only needed repositories.
+3. GitHub redirects to the setup URL with installation_id.
+4. Click Verify and link. Deplograph uses a one-time OAuth state, checks the
+   authenticated GitHub user's installation list and independently checks the App
+   installation and its permissions through a signed App JWT.
+5. After successful verification, the installation belongs to one organization,
+   and permitted repository grants are synchronized. Initial SPDX imports are
+   queued for the selected repositories.
+6. Later push and repository selection events can queue another import, and
+   revoked/suspended/deleted permissions prevent further sync.
+
+IMPORTANT: The setup URL installation_id is **not** authentication. User OAuth
+credentials are discarded after installation verification. Short-lived installation
+tokens are requested only when needed, with each SBOM import scoped to one repo ID.
+
+GitHub SBOM export is asynchronous: generate-report responds with a report URL;
+fetch-report returns 202 while processing or 302 to a temporary download when
+ready. Deplograph saves pending request UUIDs, polls through Github::SyncRepositoryJob
+and accepts only allowlisted HTTPS GitHub download hosts. The temporary URL never
+receives the installation access token. Failed and pending imports remain visible.
+
+A GitHub dependency graph SPDX report is an inventory of GitHub's dependency graph
+at export time. **It is not build provenance**, does not prove a Git commit was
+deployed, and must not be treated as verified runtime inventory. For that use OCI
+artifacts, build attestations, CI-generated SBOMs, and runtime observations.
+
+Current limitations: the prototype uses Rails' non-durable async Active Job adapter,
+so outstanding jobs can be lost on a restart. Move to Solid Queue, implement
+rate-limit backoff, and add credential-scoped job observability before production.
+Only explicitly allowed GitHub download hosts are supported: unexpected redirects
+fail closed. GitHub OAuth here verifies the installation, but user sign-in remains
+the local Deplograph password/session flow.

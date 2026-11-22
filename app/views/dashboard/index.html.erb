@@ -21,6 +21,7 @@
 </head>
 <body>
   <h1>Deplograph</h1>
+  <p><%= link_to "GitHub integrations", github_installations_path %></p>
   <p><strong>Organization:</strong> <%= current_organization.name %> · <%= current_user.email %></p>
   <% current_user.organizations.each do |organization| %>
     <% next if organization.id == current_organization.id %>

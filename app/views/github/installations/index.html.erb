@@ -1,0 +1,25 @@
+<h1>GitHub App installations</h1>
+<p>Organization: <%= current_organization.name %></p>
+<p>Only installations verified through GitHub user authorization can be linked.</p>
+<p><%= link_to "Connect another GitHub installation", github_installation_setup_path %></p>
+<% @installations.each do |installation| %>
+  <section>
+    <h2><%= installation.account_login %></h2>
+    <p>State: <%= installation.state %> | Linked: <%= installation.linked_at %></p>
+    <% if installation.state == "active" %>
+      <%= button_to "Refresh GitHub permissions", sync_github_installation_path(installation.installation_id), method: :post %>
+      <ul>
+        <% installation.github_repository_grants.order(:full_name).each do |grant| %>
+          <li>
+            <%= grant.full_name %>
+            <%= grant.enabled? ? "allowed" : "revoked" %>
+            <% if grant.enabled? %>
+              <%= button_to "Import GitHub SBOM", import_github_repository_path(installation.installation_id, grant.github_repository_id), method: :post %>
+              <small>Last sync: <%= grant.sbom_sync_status %></small>
+            <% end %>
+          </li>
+        <% end %>
+      </ul>
+    <% end %>
+  </section>
+<% end %>

@@ -6,6 +6,14 @@ Rails.application.routes.draw do
   delete "/logout", to: "sessions#destroy", as: :logout
   post "/organizations/:id/select", to: "organizations#select", as: :select_organization
   get "/api/docs", to: "docs#index"
+  get "/github/installations", to: "github/installations#index", as: :github_installations
+  get "/github/installations/setup", to: "github/installations#setup", as: :github_installation_setup
+  post "/github/installations/authorize", to: "github/installations#authorize", as: :authorize_github_installation
+  get "/github/installations/callback", to: "github/installations#callback", as: :github_installation_callback
+  post "/github/installations/:installation_id/sync", to: "github/installations#sync", as: :sync_github_installation
+  post "/github/installations/:installation_id/repositories/:repository_id/import",
+    to: "github/imports#create", as: :import_github_repository
+
 
   namespace :api do
     namespace :v1 do
