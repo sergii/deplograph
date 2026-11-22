@@ -53,7 +53,7 @@ jobs:
           bin/rails runner 'Vulnerabilities::ScanDueSnapshotsJob.perform_later'
           bundle exec ruby bin/jobs start > /tmp/deplograph-worker.log 2>&1 &
           worker_pid=$!
-          trap 'kill "$worker_pid" 2>/dev/null || true' EXIT
+          trap 'status=$?; if [[ "$status" != "0" ]]; then tail -n 100 /tmp/deplograph-worker.log || true; fi; kill "$worker_pid" 2>/dev/null || true' EXIT
           bin/rails runner '
             raise "Expected production to use Solid Queue" unless
               ActiveJob::Base.queue_adapter.class.name.include?("SolidQueue")
