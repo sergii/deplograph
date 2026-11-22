@@ -1,0 +1,32 @@
+services:
+  database:
+    image: ${POSTGRES_IMAGE:-postgres:18.7}
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-local-development-only}
+      POSTGRES_DB: deplograph_development
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d deplograph_development"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    volumes:
+      - pgdata:/var/lib/postgresql
+  web:
+    build: .
+    environment:
+      RAILS_ENV: development
+      DATABASE_URL: postgres://postgres:${POSTGRES_PASSWORD:-local-development-only}@database:5432/deplograph_development
+      SECRET_KEY_BASE: ${SECRET_KEY_BASE:-local-only-secret-key-base}
+      DEPLOGRAPH_INGEST_TOKEN: ${DEPLOGRAPH_INGEST_TOKEN:-}
+      GITHUB_TOKEN: ${GITHUB_TOKEN:-}
+      GITHUB_WEBHOOK_SECRET: ${GITHUB_WEBHOOK_SECRET:-}
+      OSV_ENABLED: ${OSV_ENABLED:-false}
+    ports:
+      - "127.0.0.1:3000:3000"
+    depends_on:
+      database:
+        condition: service_healthy
+    command: ["sh", "-c", "bin/rails db:prepare && bin/rails server -b 0.0.0.0"]
+volumes:
+  pgdata:

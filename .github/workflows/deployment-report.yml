@@ -1,0 +1,75 @@
+name: Report deployment
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: "Environment name"
+        required: true
+        type: string
+      kind:
+        description: "Environment kind"
+        required: true
+        type: choice
+        options: [production, staging, sandbox, test, preview]
+      deployment_id:
+        description: "Shared deployment identity for correlating Kamal/Kubernetes events (optional)"
+        required: false
+        type: string
+      release:
+        description: "Previously registered release name (optional)"
+        required: false
+        type: string
+      image:
+        description: "OCI image repository (optional)"
+        required: false
+        type: string
+      image_digest:
+        description: "Actual sha256 digest (optional)"
+        required: false
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  report:
+    runs-on: ubuntu-latest
+    environment: ${{ inputs.environment }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Report deployment metadata
+        env:
+          API_URL: ${{ vars.DEPLOGRAPH_API_URL }}
+          INGEST_TOKEN: ${{ secrets.DEPLOGRAPH_INGEST_TOKEN }}
+          TARGET_ENV: ${{ inputs.environment }}
+          TARGET_KIND: ${{ inputs.kind }}
+          IMAGE: ${{ inputs.image }}
+          IMAGE_DIGEST: ${{ inputs.image_digest }}
+          EVENT_ID: gh-${{ github.run_id }}-${{ github.run_attempt }}
+          SHARED_DEPLOYMENT_ID: ${{ inputs.deployment_id }}
+          RELEASE: ${{ inputs.release }}
+          REPOSITORY: ${{ github.repository }}
+          COMMIT_SHA: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          if [[ -z "$API_URL" || -z "$INGEST_TOKEN" ]]; then
+            echo "Set DEPLOGRAPH_API_URL and DEPLOGRAPH_INGEST_TOKEN first"
+            exit 1
+          fi
+          DEPLOYMENT_ID="${SHARED_DEPLOYMENT_ID:-gh-${EVENT_ID}}"
+          jq -n --arg repo "$REPOSITORY" --arg env "$TARGET_ENV" \
+            --arg kind "$TARGET_KIND" --arg image "$IMAGE" \
+            --arg digest "$IMAGE_DIGEST" --arg sha "$COMMIT_SHA" \
+            --arg id "$DEPLOYMENT_ID" --arg event "$EVENT_ID" --arg release "$RELEASE" \
+            --arg at "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+            '{repository:$repo,environment:$env,environment_kind:$kind,
+              deployment_id:$id,source:"github_actions",event_type:"deployment.reported",
+              event_id:$event,commit_sha:$sha,occurred_at:$at}
+              + (if $release == "" then {} else {release:$release} end)
+              + (if $digest == "" then {} else {image:$image,image_digest:$digest} end)' \
+            > /tmp/deployment.json
+          curl --fail-with-body --silent --show-error --retry 2 \
+            -H "Authorization: Bearer $INGEST_TOKEN" \
+            -H "Content-Type: application/json" \
+            --data-binary @/tmp/deployment.json \
+            "${API_URL%/}/api/v1/integration_events"

@@ -1,0 +1,52 @@
+{
+  "description": "Synthetic example, not live deployment evidence",
+  "nodes": [
+    {
+      "id": "repo",
+      "type": "repository",
+      "name": "acme/rails-app"
+    },
+    {
+      "id": "commit",
+      "type": "commit",
+      "sha": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+    },
+    {
+      "id": "image",
+      "type": "oci_image",
+      "digest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    },
+    {
+      "id": "production",
+      "type": "environment",
+      "name": "production"
+    },
+    {
+      "id": "rack",
+      "type": "component",
+      "purl": "pkg:gem/rack@3.1.0"
+    }
+  ],
+  "edges": [
+    {
+      "from": "repo",
+      "to": "commit",
+      "type": "contains"
+    },
+    {
+      "from": "commit",
+      "to": "image",
+      "type": "built_as"
+    },
+    {
+      "from": "image",
+      "to": "production",
+      "type": "reported_deployed_to"
+    },
+    {
+      "from": "image",
+      "to": "rack",
+      "type": "contains_component"
+    }
+  ]
+}

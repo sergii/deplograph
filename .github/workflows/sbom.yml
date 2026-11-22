@@ -1,0 +1,43 @@
+name: Generate source SBOM
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  sbom:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: anchore/sbom-action@v0
+        with:
+          path: .
+          format: cyclonedx-json
+          output-file: sbom.cdx.json
+          upload-artifact: true
+      - name: Ingest when configured
+        if: ${{ vars.DEPLOGRAPH_API_URL != '' }}
+        env:
+          API_URL: ${{ vars.DEPLOGRAPH_API_URL }}
+          INGEST_TOKEN: ${{ secrets.DEPLOGRAPH_INGEST_TOKEN }}
+          REPOSITORY: ${{ github.repository }}
+          COMMIT_SHA: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          if [[ -z "$INGEST_TOKEN" ]]; then
+            echo "No token: SBOM will remain as workflow artifact"
+            exit 0
+          fi
+          jq -n --arg repo "$REPOSITORY" --arg sha "$COMMIT_SHA" \
+            --slurpfile sbom sbom.cdx.json \
+            '{repository:$repo,artifact_identifier:("git:"+$sha),
+              artifact_kind:"source",commit_sha:$sha,format:"cyclonedx",
+              source:"github_actions",sbom:$sbom[0]}' >/tmp/inventory.json
+          curl --fail-with-body --silent --show-error --retry 2 \
+            -H "Authorization: Bearer $INGEST_TOKEN" \
+            -H "Content-Type: application/json" \
+            --data-binary @/tmp/inventory.json \
+            "${API_URL%/}/api/v1/inventories"

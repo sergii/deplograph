@@ -1,0 +1,50 @@
+{
+  "spdxVersion": "SPDX-2.3",
+  "dataLicense": "CC0-1.0",
+  "SPDXID": "SPDXRef-DOCUMENT",
+  "name": "example-rails-app",
+  "documentNamespace": "https://example.invalid/sbom/deplograph-example",
+  "creationInfo": {
+    "creators": [
+      "Tool: DeplographDemo-0.1"
+    ],
+    "created": "2026-11-20T00:00:00Z"
+  },
+  "packages": [
+    {
+      "SPDXID": "SPDXRef-Package-rails",
+      "name": "rails",
+      "versionInfo": "8.1.0",
+      "downloadLocation": "NOASSERTION",
+      "filesAnalyzed": false,
+      "externalRefs": [
+        {
+          "referenceCategory": "PACKAGE-MANAGER",
+          "referenceType": "purl",
+          "referenceLocator": "pkg:gem/rails@8.1.0"
+        }
+      ]
+    },
+    {
+      "SPDXID": "SPDXRef-Package-rack",
+      "name": "rack",
+      "versionInfo": "3.1.0",
+      "downloadLocation": "NOASSERTION",
+      "filesAnalyzed": false,
+      "externalRefs": [
+        {
+          "referenceCategory": "PACKAGE-MANAGER",
+          "referenceType": "purl",
+          "referenceLocator": "pkg:gem/rack@3.1.0"
+        }
+      ]
+    }
+  ],
+  "relationships": [
+    {
+      "spdxElementId": "SPDXRef-Package-rails",
+      "relatedSpdxElement": "SPDXRef-Package-rack",
+      "relationshipType": "DEPENDS_ON"
+    }
+  ]
+}

@@ -1,0 +1,9 @@
+{
+  "repository": "acme/rails-app",
+  "application": "example-rails-app",
+  "event": "created",
+  "environment": "preview-5303-1",
+  "kind": "preview",
+  "external_id": "preview-5303-1",
+  "expires_at": "2026-11-23T12:00:00Z"
+}

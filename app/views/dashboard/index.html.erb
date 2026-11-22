@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Deplograph | Software inventory</title>
+  <style>
+    :root { color-scheme: light; font-family: ui-sans-serif,system-ui,-apple-system,sans-serif; background:#f8fafc; color:#0f172a; }
+    body { max-width:1050px; margin:48px auto; padding:0 24px; }
+    h1 { font-size:32px; letter-spacing:-1px; }
+    h2 { font-size:19px; margin-top:38px; }
+    small, .muted { color:#64748b; }
+    .grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(200px,1fr)); gap:12px; }
+    .card { background:white; border:1px solid #e2e8f0; border-radius:12px; padding:18px; }
+    .big { font-size:30px; font-weight:700; margin:4px 0; }
+    table { width:100%; border-collapse:collapse; background:white; border:1px solid #e2e8f0; border-radius:12px; overflow:hidden; }
+    td, th { padding:12px 14px; text-align:left; border-bottom:1px solid #e2e8f0; font-size:14px; }
+    th { color:#64748b; font-weight:600; }
+    code { font-size:12px; overflow-wrap:anywhere; }
+  </style>
+</head>
+<body>
+  <h1>Deplograph</h1>
+  <p class="muted">Know what runs where. Inventory from repository to deployment.</p>
+  <div class="grid">
+    <div class="card"><small>Applications</small><div class="big"><%= @applications.length %></div></div>
+    <div class="card"><small>Inventory snapshots</small><div class="big"><%= InventorySnapshot.count %></div></div>
+    <div class="card"><small>Recorded deployments</small><div class="big"><%= Deployment.count %></div></div>
+    <div class="card"><small>Vulnerability matches</small><div class="big"><%= VulnerabilityMatch.count %></div></div>
+  </div>
+  <h2>Applications</h2>
+  <div class="grid">
+    <% @applications.each do |app| %>
+      <div class="card">
+        <strong><%= app.name %></strong>
+        <p><small><%= app.repository_full_name %></small></p>
+        <% app.environments.each do |env| %>
+          <p><%= env.name %> <small>(<%= env.state %>, <%= env.kind %>)</small></p>
+        <% end %>
+      </div>
+    <% end %>
+    <% if @applications.empty? %><p class="muted">No applications yet. Import an example SBOM to begin.</p><% end %>
+  </div>
+  <h2>Recent deployments</h2>
+  <table>
+    <tr><th>Environment</th><th>Artifact</th><th>Evidence</th><th>When</th></tr>
+    <% @deployments.each do |deployment| %>
+      <tr>
+        <td><%= deployment.environment.application.name %> / <%= deployment.environment.name %></td>
+        <td><code><%= deployment.artifact.identifier %></code></td>
+        <td><%= deployment.status %></td>
+        <td><%= deployment.deployed_at.utc.iso8601 %></td>
+      </tr>
+    <% end %>
+  </table>
+  <h2>Recent inventories</h2>
+  <table>
+    <tr><th>Application</th><th>SBOM</th><th>Components</th><th>Matching</th></tr>
+    <% @snapshots.each do |snapshot| %>
+      <tr>
+        <td><%= snapshot.artifact.application.name %></td>
+        <td><%= snapshot.format %></td>
+        <td><%= snapshot.component_occurrences.count %></td>
+        <td><%= snapshot.match_status %></td>
+      </tr>
+    <% end %>
+  </table>
+</body>
+</html>
