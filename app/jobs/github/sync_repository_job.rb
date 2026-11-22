@@ -45,6 +45,10 @@ module Github
       end
     rescue SbomImporter::PermissionError
       # Revoked installations cannot be retried with the same credentials.
+      if grant&.enabled?
+        grant.update!(sbom_sync_status: "failed",
+          last_import_error: "GitHub App access revoked or scope invalid")
+      end
       Rails.logger.info("GitHub SBOM import access revoked for installation #{installation_id}")
     rescue HttpClient::Error, Inventory::Importer::InvalidDocument, KeyError => error
       if grant&.enabled?
