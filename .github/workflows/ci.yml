@@ -27,7 +27,6 @@ jobs:
       RAILS_ENV: test
       DATABASE_URL: postgres://postgres:postgres@localhost:5432/deplograph_test
       SECRET_KEY_BASE: test-only-secret-key-base
-      DEPLOGRAPH_INGEST_TOKEN: test-only-ingest-token
       OSV_ENABLED: "false"
     steps:
       - uses: actions/checkout@v4

@@ -3,7 +3,7 @@ require "test_helper"
 module Inventory
   class ImporterTest < ActiveSupport::TestCase
     setup do
-      @application = Application.create!(name: "Demo", repository_full_name: "acme/inventory-demo")
+      @application = Application.create!(organization: create_test_organization, name: "Demo", repository_full_name: "acme/inventory-demo")
     end
 
     test "imports CycloneDX and dependency relationships" do

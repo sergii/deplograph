@@ -3,7 +3,7 @@ module Api
     class BaseController < ActionController::API
       MAX_PAYLOAD_BYTES = 5 * 1024 * 1024
 
-      before_action :authenticate_ingestion!
+      before_action :authenticate_integration!
 
       rescue_from Artifacts::IdentityConflict, with: :identity_conflict
       rescue_from JSON::ParserError, with: :invalid_json
@@ -12,26 +12,38 @@ module Api
 
       private
 
-      def authenticate_ingestion!
-        token = ENV["DEPLOGRAPH_INGEST_TOKEN"]
-        if token.blank?
-          render json: { error: "Ingestion is not configured" }, status: :service_unavailable
+      attr_reader :current_credential
+
+      def current_organization
+        current_credential.organization
+      end
+
+      def authenticate_integration!
+        @current_credential = IntegrationCredential.authenticate(request.authorization)
+        unless @current_credential
+          render json: { error: "Missing, revoked or expired integration credential" },
+                 status: :unauthorized
           return
         end
 
-        supplied = request.authorization.to_s.delete_prefix("Bearer ")
-        unless supplied.bytesize == token.bytesize &&
-               ActiveSupport::SecurityUtils.secure_compare(supplied, token)
-          render json: { error: "Unauthorized" }, status: :unauthorized
-        end
+        @current_credential.update_column(:last_used_at, Time.current)
+      end
+
+      def authorize_integration!(permission:, repository: nil, environment: nil, provider: nil)
+        return true if current_credential.permits?(
+          permission: permission, repository: repository,
+          environment: environment, provider: provider
+        )
+
+        render json: { error: "Insufficient credential permissions or scope" }, status: :forbidden
+        false
       end
 
       def payload
         @payload ||= begin
           body = request.raw_post
-          if body.bytesize > MAX_PAYLOAD_BYTES
-            raise ArgumentError, "Payload exceeds 5 MB"
-          end
+          raise ArgumentError, "Payload exceeds 5 MB" if body.bytesize > MAX_PAYLOAD_BYTES
+
           data = JSON.parse(body)
           raise ArgumentError, "Expected a JSON object" unless data.is_a?(Hash)
 
@@ -41,9 +53,11 @@ module Api
 
       def application_for(body)
         full_name = body.fetch("repository")
-        raise ArgumentError, "Invalid repository" unless full_name.match?(/\A[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+\z/)
+        unless full_name.is_a?(String) && full_name.match?(/\A[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+\z/)
+          raise ArgumentError, "Invalid repository"
+        end
 
-        Application.find_or_create_by!(repository_full_name: full_name) do |app|
+        current_organization.applications.find_or_create_by!(repository_full_name: full_name) do |app|
           app.name = body["application"].presence || full_name.split("/").last
         end
       end

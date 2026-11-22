@@ -5,6 +5,7 @@ ruby file: ".ruby-version"
 gem "rails", "8.1.4.1"
 gem "pg", "~> 1.5"
 gem "puma", ">= 6.0"
+gem "bcrypt", "~> 3.1"
 
 group :test do
   gem "webmock", "~> 3.25"

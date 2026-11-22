@@ -40,7 +40,7 @@ jobs:
       - name: Report deployment metadata
         env:
           API_URL: ${{ vars.DEPLOGRAPH_API_URL }}
-          INGEST_TOKEN: ${{ secrets.DEPLOGRAPH_INGEST_TOKEN }}
+          INGEST_TOKEN: ${{ secrets.DEPLOGRAPH_API_TOKEN }}
           TARGET_ENV: ${{ inputs.environment }}
           TARGET_KIND: ${{ inputs.kind }}
           IMAGE: ${{ inputs.image }}
@@ -53,7 +53,7 @@ jobs:
         run: |
           set -euo pipefail
           if [[ -z "$API_URL" || -z "$INGEST_TOKEN" ]]; then
-            echo "Set DEPLOGRAPH_API_URL and DEPLOGRAPH_INGEST_TOKEN first"
+            echo "Set DEPLOGRAPH_API_URL and DEPLOGRAPH_API_TOKEN first"
             exit 1
           fi
           DEPLOYMENT_ID="${SHARED_DEPLOYMENT_ID:-gh-${EVENT_ID}}"

@@ -7,7 +7,7 @@ module Integrations
     TYPES = %w[deployment.reported artifact.observed].freeze
     MAX_EVENT_AGE = 365.days
 
-    def call(body)
+    def call(body, organization:)
       source = body.fetch("source")
       type = body.fetch("event_type")
       raise ArgumentError, "Unsupported source" unless SOURCES.include?(source)
@@ -30,7 +30,7 @@ module Integrations
       raise ArgumentError, "Invalid environment name" unless name.match?(/\A[a-zA-Z0-9_.-]{1,120}\z/)
 
       ApplicationRecord.transaction do
-        app = Application.find_or_create_by!(repository_full_name: repository) do |record|
+        app = organization.applications.find_or_create_by!(repository_full_name: repository) do |record|
           record.name = repository.split("/").last
         end
 
