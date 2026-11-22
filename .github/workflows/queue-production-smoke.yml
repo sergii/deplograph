@@ -1,0 +1,88 @@
+name: Durable production queue smoke
+
+on:
+  pull_request:
+    paths:
+      - "Gemfile"
+      - "Gemfile.lock"
+      - "db/queue_schema.rb"
+      - "config/database.yml"
+      - "config/queue.yml"
+      - "config/environments/production.rb"
+      - "bin/jobs"
+      - ".github/workflows/queue-production-smoke.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  production-queue:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    services:
+      postgres:
+        image: postgres:18.7
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 10
+    env:
+      RAILS_ENV: production
+      DATABASE_URL: postgres://postgres:postgres@localhost:5432/deplograph_pilot_primary
+      QUEUE_DATABASE_URL: postgres://postgres:postgres@localhost:5432/deplograph_pilot_queue
+      SECRET_KEY_BASE: ephemeral-ci-only-secret-key
+      OSV_ENABLED: "false"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: .ruby-version
+          bundler-cache: true
+      - name: Prepare application and durable queue databases
+        run: bin/rails db:prepare
+      - name: Verify an independently running worker executes persisted work
+        run: |
+          set -euo pipefail
+          bin/rails runner 'Vulnerabilities::ScanDueSnapshotsJob.perform_later'
+          bundle exec ruby bin/jobs start > /tmp/deplograph-worker.log 2>&1 &
+          worker_pid=$!
+          trap 'kill "$worker_pid" 2>/dev/null || true' EXIT
+          sleep 3
+          if ! kill -0 "$worker_pid" 2>/dev/null; then
+            echo "Solid Queue worker exited before claiming the job."
+            tail -n 100 /tmp/deplograph-worker.log || true
+            exit 1
+          fi
+          if ! bin/rails runner '
+            raise "Expected production to use Solid Queue" unless
+              ActiveJob::Base.queue_adapter.class.name.include?("SolidQueue")
+            30.times do
+              completed = SolidQueue::Job.where(
+                class_name: "Vulnerabilities::ScanDueSnapshotsJob"
+              ).where.not(finished_at: nil).exists?
+              if completed
+                puts "Durable worker executed a persisted job."
+                exit 0
+              end
+              sleep 1
+            end
+            warn "Solid Queue diagnostic: #{{
+              jobs: SolidQueue::Job.where(
+                class_name: "Vulnerabilities::ScanDueSnapshotsJob"
+              ).pluck(:id, :finished_at),
+              ready: SolidQueue::ReadyExecution.count,
+              failed: SolidQueue::FailedExecution.count,
+              processes: SolidQueue::Process.count
+            }.inspect}"
+            raise "Worker did not execute persisted job"
+          '; then
+            tail -n 100 /tmp/deplograph-worker.log || true
+            exit 1
+          fi

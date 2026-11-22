@@ -1,0 +1,50 @@
+name: MVP public repository and live OSV pilot
+
+on:
+  pull_request:
+    paths:
+      - "script/ci/public_repository_pilot.rb"
+      - ".github/workflows/mvp-live-pilot.yml"
+      - "app/services/inventory/**"
+      - "app/services/vulnerabilities/**"
+      - "app/jobs/vulnerabilities/**"
+      - "Gemfile"
+      - "Gemfile.lock"
+      - "config/database.yml"
+      - "db/**"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  public-repository:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    services:
+      postgres:
+        image: postgres:18.7
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 10
+    env:
+      RAILS_ENV: test
+      DATABASE_URL: postgres://postgres:postgres@localhost:5432/deplograph_test
+      SECRET_KEY_BASE: pilot-only-nonproduction-key
+      OSV_ENABLED: "false"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: .ruby-version
+          bundler-cache: true
+      - run: bin/rails db:prepare
+      - name: Import public Rails lockfile and query real OSV
+        run: bin/rails runner script/ci/public_repository_pilot.rb

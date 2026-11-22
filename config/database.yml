@@ -12,5 +12,10 @@ test:
   database: deplograph_test
 
 production:
-  <<: *default
-  url: <%= ENV.fetch("DATABASE_URL") %>
+  primary:
+    <<: *default
+    url: <%= ENV.fetch("DATABASE_URL") %>
+  queue:
+    <<: *default
+    url: <%= ENV["QUEUE_DATABASE_URL"] %>
+    migrations_paths: db/queue_migrate

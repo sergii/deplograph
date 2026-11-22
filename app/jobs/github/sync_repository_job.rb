@@ -3,6 +3,7 @@ module Github
     queue_as :default
 
     MAX_POLL_ATTEMPTS = 8
+    retry_on HttpClient::Error, wait: :polynomially_longer, attempts: 3
 
     def perform(installation_id:, repository_id:, attempt: 0)
       installation = GithubInstallation.find_by(installation_id: installation_id)
@@ -43,10 +44,18 @@ module Github
         end
       end
     rescue SbomImporter::PermissionError
-      # Revocation is expected. Never retry with the same access grant.
+      # Revoked installations cannot be retried with the same credentials.
+      if grant&.enabled?
+        grant.update!(sbom_sync_status: "failed",
+          last_import_error: "GitHub App access revoked or scope invalid")
+      end
       Rails.logger.info("GitHub SBOM import access revoked for installation #{installation_id}")
     rescue HttpClient::Error, Inventory::Importer::InvalidDocument, KeyError => error
+      if grant&.enabled?
+        grant.update!(sbom_sync_status: "failed", last_import_error: error.class.name)
+      end
       Rails.logger.warn("GitHub SBOM import failed for repository ID #{repository_id}: #{error.class}")
+      raise
     end
   end
 end
