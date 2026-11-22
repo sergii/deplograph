@@ -1,5 +1,6 @@
 class Application < ApplicationRecord
   belongs_to :organization
+  has_many :drift_comparisons, dependent: :destroy
   has_many :environments, dependent: :destroy
   has_many :artifacts, dependent: :destroy
   has_many :source_revisions, dependent: :destroy
