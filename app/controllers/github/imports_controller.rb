@@ -9,18 +9,21 @@ module Github
       grant = installation.github_repository_grants.find_by!(
         github_repository_id: params.require(:repository_id), enabled: true
       )
-      result = SbomImporter.new.call(grant: grant)
+      return head :forbidden unless installation.state == "active"
+
+      job = SyncRepositoryJob.perform_later(
+        installation_id: installation.installation_id,
+        repository_id: grant.github_repository_id
+      )
+      return head :service_unavailable unless job
+
+      grant.update!(sbom_sync_status: "pending", last_import_error: nil)
       if request.format.json?
-        render json: { status: result.status, inventory_snapshot_id: result.snapshot_id },
-          status: result.status == "pending" ? :accepted : :created
+        render json: { status: "queued", repository: grant.full_name }, status: :accepted
       else
         redirect_to github_installations_path,
-          notice: result.status == "pending" ? "SBOM is processing. Retry import to fetch it." : "SBOM imported."
+          notice: "Repository inventory queued. Status updates appear here automatically."
       end
-    rescue SbomImporter::PermissionError
-      head :forbidden
-    rescue HttpClient::Error, Inventory::Importer::InvalidDocument
-      head :bad_gateway
     end
 
     private
