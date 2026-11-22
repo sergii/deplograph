@@ -44,7 +44,7 @@ raise "Scan must start as not_scanned" unless snapshot.match_status == "not_scan
 # Query the real OSV API. The CI test suite normally uses WebMock instead.
 # Invoke the job's domain operation directly in Rails runner: this smoke
 # exercises real matching and persistence, not Active Job instrumentation.
-Vulnerabilities::MatchSnapshotJob.new.perform(snapshot.id, trigger: "pilot_live_osv")
+Vulnerabilities::MatchSnapshotJob.new.perform(snapshot.id, trigger: "manual")
 snapshot.reload
 raise "OSV scan did not complete" unless snapshot.match_status == "completed"
 scan = snapshot.vulnerability_scan_runs.order(:id).last
