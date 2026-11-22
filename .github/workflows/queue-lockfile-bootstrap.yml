@@ -21,7 +21,7 @@ jobs:
           ruby-version: .ruby-version
           bundler-cache: false
       - name: Resolve Solid Queue dependencies
-        run: bundle lock --update solid_queue
+        run: bundle lock
       - name: Emit resolved public lockfile for a reviewed commit
         run: |
           echo "DEPLOGRAPH_LOCKFILE_START"
